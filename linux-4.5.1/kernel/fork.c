@@ -1285,7 +1285,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	 * thread groups also imply shared VM. Blocking this case allows
 	 * for various simplifications(简化) in other code.
 	 *
-	 * 共享信号处理函数代表这共享内存，通过上述方式，线程组也代表着需要共享内存。阻止这种情况是为了简化其他的代码
+	 * 共享信号处理函数代表着共享内存，通过上述方式，线程组也代表着需要共享内存。阻止这种情况是为了简化其他的代码
 	 */
 	if ((clone_flags & CLONE_SIGHAND) && !(clone_flags & CLONE_VM))
 		return ERR_PTR(-EINVAL);
