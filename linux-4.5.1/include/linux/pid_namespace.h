@@ -21,15 +21,25 @@ struct pidmap {
 
 struct fs_pin;
 
+/**
+   进程命名空间
+*/
 struct pid_namespace {
+	// 引用计数
 	struct kref kref;
+	// pid分配的bitmap，如果位是1，则表示该pid已经被分配了
 	struct pidmap pidmap[PIDMAP_ENTRIES];
 	struct rcu_head rcu;
+	// 上次分配的pid
 	int last_pid;
+	// 
 	unsigned int nr_hashed;
+	// 表示进程结束之后，需要这个child_reaper进程对这个进程进行托管。
 	struct task_struct *child_reaper;
 	struct kmem_cache *pid_cachep;
-	unsigned int level; // Pid命名空间的级别,主要用于体现命名空间的层次结构
+	// Pid命名空间的级别,主要用于体现命名空间的层次结构
+	unsigned int level; 
+	// 父 进程命名空间
 	struct pid_namespace *parent;
 #ifdef CONFIG_PROC_FS
 	struct vfsmount *proc_mnt;

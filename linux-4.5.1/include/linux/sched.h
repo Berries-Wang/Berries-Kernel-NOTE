@@ -1582,7 +1582,9 @@ struct task_struct {
 	struct fs_struct *fs;
 /* open file information */
 	struct files_struct *files;
-/* namespaces */
+      /* namespaces
+         由nsproxy来统一维护该进程所属的命名空间
+       */
 	struct nsproxy *nsproxy;
 /* signal handlers */
 	struct signal_struct *signal;

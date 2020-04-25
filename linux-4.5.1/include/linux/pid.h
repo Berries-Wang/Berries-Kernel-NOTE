@@ -61,11 +61,20 @@ struct upid {
 struct pid
 {
 	atomic_t count;
+	// pid的级别(深度)
 	unsigned int level;
 	/* lists of tasks that use this pid */
+	// 引用该pid的task
 	struct hlist_head tasks[PIDTYPE_MAX];
 	struct rcu_head rcu;
-	struct upid numbers[1]; // 虽然这里定义的长度为1,但是可以拓展啊。一个PID可以属于不同的namespace， numbers[0]表示global namespace，numbers[i]表示第i层namespace，i越大所在层级越低。
+	/*
+	    1. 虽然这里定义的长度为1,但是可以拓展啊。一个PID可以属于不同的namespace， numbers[0]表示global namespace，numbers[i]表示第i层namespace，i越大所在层级越低。
+	    2. 这样实现的目的是：一个进程可以属于多个进程命名空间
+	*/
+	/*
+	   numbers 是一个数据，表示一个task_struct在每个namespace下的id(该id就是getpid()所得到的值)，numbers[0]表示最顶层的namespace，level=0，number[1]表示level=1
+	*/
+	struct upid numbers[1]; 
 };
 
 extern struct pid init_struct_pid;

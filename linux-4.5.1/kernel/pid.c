@@ -432,15 +432,22 @@ void transfer_pid(struct task_struct *old, struct task_struct *new,
 	hlist_replace_rcu(&old->pids[type].node, &new->pids[type].node);
 }
 
+/**
+   获取任务的任务描述符信息
+*/
 struct task_struct *pid_task(struct pid *pid, enum pid_type type)
 {
 	struct task_struct *result = NULL;
 	if (pid) {
 		struct hlist_node *first;
+		// 计算出hlist_node的地址，该属性位于struct pid下的tasks(hlist_head类型)的first属性；
 		first = rcu_dereference_check(hlist_first_rcu(&pid->tasks[type]),
 					      lockdep_tasklist_lock_is_held());
-		if (first)
-			result = hlist_entry(first, struct task_struct, pids[(type)].node);
+		if (first){
+			  // 通过hlist_node的地址，计算进程描述符的地址(hlist_node的属性位于struct task 结构体下的pids(pid_like类型)下)
+			  result = hlist_entry(first, struct task_struct, pids[(type)].node);
+		   }
+		}
 	}
 	return result;
 }

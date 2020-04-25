@@ -333,6 +333,7 @@ void set_task_stack_end_magic(struct task_struct *tsk)
 
 /**
  *
+ * 为新进程创建内核栈
  * @param orig
  * @return
  */
