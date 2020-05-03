@@ -7,6 +7,9 @@
  * Definitions unique to the original Linux SLAB allocator.
  */
 
+/**
+ * 高速缓存描述符
+ */
 struct kmem_cache {
 	struct array_cache __percpu *cpu_cache;
 
@@ -35,10 +38,15 @@ struct kmem_cache {
 	unsigned int freelist_size;
 
 	/* constructor func */
+	/**
+	 * 创建slab时用于初始化每个对象的构造函数，低版本内核中还有析构函数。
+	 */
 	void (*ctor)(void *obj);
 
 /* 4) cache creation/removal */
+	// 缓冲区名字
 	const char *name;
+	// 包含所有缓冲区描述结构的双向循环列表，队列头为slab_caches
 	struct list_head list;
 	int refcount;
 	int object_size;
@@ -74,6 +82,7 @@ struct kmem_cache {
 	struct memcg_cache_params memcg_params;
 #endif
 
+    // 为每个节点创建的slab信息的数据结构
 	struct kmem_cache_node *node[MAX_NUMNODES];
 };
 

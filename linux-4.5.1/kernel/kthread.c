@@ -218,7 +218,7 @@ static int kthread(void *_create)
  * 每个CPU来说有本地内存和远端内存，访问本地内存的代价比访问远端内存的代价小。
  * 确保CPU访问内存代价最小，是非常重要的一点。
  *
- * 若使用了NUMA技术,且父进程是kthread_task(Linux 系统2号进程）,返回父进程的pref_node_fork。否则返回NUMA_NO_NODE
+ * 若使用了NUMA技术,且父进程是kthread_task(Linux 系统2号进程）,返回父进程的pref_node_fork。否则返回NUMA_NO_NODE(-1)
  * @param tsk
  * @return
  */

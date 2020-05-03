@@ -187,9 +187,13 @@ static bool pfmemalloc_active __read_mostly;
  *
  */
 struct array_cache {
+	// 空闲对象的指针个数
 	unsigned int avail;
+	// 栈总长度
 	unsigned int limit;
+	// 一次向slab中分配、释放对象的个数
 	unsigned int batchcount;
+	// 最近是否被访问
 	unsigned int touched;
 	void *entry[];	/*
 			 * Must have this definition in here for the proper
@@ -2590,6 +2594,17 @@ static void slab_map_pages(struct kmem_cache *cache, struct page *page,
  * Grow (by 1) the number of slabs within a cache.  This is called by
  * kmem_cache_alloc() when there are no active objs left in a cache.
  */
+
+/**
+ * @brief      高速缓存扩容
+ *
+ * @param      cachep  高速缓存
+ * @param[in]  flags   The flags
+ * @param[in]  nodeid  NUMA概念中的NODE
+ * @param      page    实参为NULL
+ *
+ * @return     { description_of_the_return_value }
+ */
 static int cache_grow(struct kmem_cache *cachep,
 		gfp_t flags, int nodeid, struct page *page)
 {
@@ -2637,12 +2652,14 @@ static int cache_grow(struct kmem_cache *cachep,
 	 * Get mem for the objs.  Attempt to allocate a physical page from
 	 * 'nodeid'.
 	 */
+	// 调用kmem_getpages来获取新的页
 	if (!page)
 		page = kmem_getpages(cachep, local_flags, nodeid);
 	if (!page)
 		goto failed;
 
 	/* Get slab management. */
+	// 获取新的slab描述符？
 	freelist = alloc_slabmgmt(cachep, page, offset,
 			local_flags & ~GFP_CONSTRAINT_MASK, nodeid);
 	if (!freelist)
@@ -2771,6 +2788,15 @@ static struct page *get_first_slab(struct kmem_cache_node *n)
 	return page;
 }
 
+/**
+ * @brief      { function_description }
+ *
+ * @param      cachep        The cachep
+ * @param[in]  flags         The flags
+ * @param[in]  force_refill  The force refill
+ *
+ * @return     { description_of_the_return_value }
+ */
 static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags,
 							bool force_refill)
 {
@@ -2781,6 +2807,7 @@ static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags,
 
 	check_irq_off();
 	node = numa_mem_id();
+	//  if(unlikely(a<b)) 和 if(a<b) 的功能也是一样的。不一样的只是他们生成的二进制代码有所不一样
 	if (unlikely(force_refill))
 		goto force_grow;
 retry:
@@ -2846,6 +2873,7 @@ alloc_done:
 	if (unlikely(!ac->avail)) {
 		int x;
 force_grow:
+        // 高速缓存扩容
 		x = cache_grow(cachep, gfp_exact_node(flags), node, NULL);
 
 		/* cache_grow can reenable interrupts, then ac could change. */
@@ -2934,6 +2962,14 @@ static bool slab_should_failslab(struct kmem_cache *cachep, gfp_t flags)
 	return should_failslab(cachep->object_size, flags, cachep->flags);
 }
 
+/**
+ * @brief      从高速缓存中获取对象
+ *
+ * @param      cachep  The cachep
+ * @param[in]  flags   The flags
+ *
+ * @return     { description_of_the_return_value }
+ */
 static inline void *____cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 {
 	void *objp;
@@ -2942,9 +2978,13 @@ static inline void *____cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 
 	check_irq_off();
 
+    // 获取高速缓存中的array_cache , kmem_cache中的cpu_cache字段
 	ac = cpu_cache_get(cachep);
+	// 如果高速缓存中没有可用的对象，则需要重新填充,if(likely(a>b))在功能上和if(a>b)上是等价的，只不过他们生成的二进制代码是不一样的。
 	if (likely(ac->avail)) {
+
 		ac->touched = 1;
+
 		objp = ac_get_obj(cachep, ac, flags, false);
 
 		/*
@@ -3250,6 +3290,7 @@ slab_alloc(struct kmem_cache *cachep, gfp_t flags, unsigned long caller)
 
 	cache_alloc_debugcheck_before(cachep, flags);
 	local_irq_save(save_flags);
+	// 实际分配
 	objp = __do_cache_alloc(cachep, flags);
 	local_irq_restore(save_flags);
 	objp = cache_alloc_debugcheck_after(cachep, flags, objp, caller);
@@ -3446,6 +3487,8 @@ EXPORT_SYMBOL(kmem_cache_alloc_trace);
  * @flags: See kmalloc().
  * @nodeid: node number of the target node.
  *
+ *
+ * 与kmem_cache_alloc相同，但是他会根据给定的node来分配内存，从而提高CPU绑定结构的效率。NUMA?
  * Identical to kmem_cache_alloc but it will allocate memory on the given
  * node, which can improve the performance for cpu bound structures.
  *

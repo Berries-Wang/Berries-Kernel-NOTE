@@ -1714,6 +1714,7 @@ struct task_struct {
 #ifdef CONFIG_NUMA
 	struct mempolicy *mempolicy;	/* Protected by alloc_lock */
 	short il_next;
+	// pref_node_fork 的含义是什么？
 	short pref_node_fork;
 #endif
 #ifdef CONFIG_NUMA_BALANCING

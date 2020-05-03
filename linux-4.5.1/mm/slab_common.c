@@ -381,6 +381,24 @@ out_free_cache:
  * cacheline.  This can be beneficial if you're counting cycles as closely
  * as davem.
  */
+
+/**
+ * @brief     SLAB分配器接口{每一个高速缓存都是同种类型对象的一种储备，即一个高速缓存只能为一种类型的对象提供缓存}
+ *
+ * @param[in]  name   字符串，代表这高速缓存的名字
+ * @param[in]  size   高速缓存中每个元素的大小
+ * @param[in]  align  slab内第一个对象的偏移，他用来确保在页内进行特定的对齐。通常情况下，0就可以(0代表标准对齐)
+ * @param[in]  flags  可选设置项，用来控制高速缓存的行为.可能的值有：
+ *                    SLAB_HWCACHE_ALIGN:命令slab层把一个slab内的所有对象按高速缓存行对齐，这就防止了错误的共享(两个或者多个对象尽管位于不同的内存地址，但映射到
+ *                    相同的缓存行(由上述的英文注释得知，缓存行是硬件中的)中去)。这可以提高性能，但以增加内存开销为代码，因为对齐越严格，消费的内存就越多。(理想的选择)
+ *                    SLAB_POISON： 命令slab层使用已知的值(a5a5a5a5)来填充slab，有利于对未初始化内存的访问
+ *                    SLAB_RED_ZONE： 该标识会导致slab层在已分配的内存周围插入 红色警戒区 以探测缓冲越界
+ *                    SLAB_PANIC: 该标志当分配失败时会提醒slab层。
+ *                    SLAB_CACHE_DMA： 该标志命令slab层使用可以执行DMA的内存给每个slab分配空间。只有在分配的对象用于DMA，而且必须驻留ZONE_DMA区时才需要这个标识。
+ * @param[in]  ctor   高速缓存的构造函数。只有在新的页追加到高速缓存的时候，构造函数才会生效。
+ *
+ * @return     成功时，指向高速缓存的指针；失败时返回NULL。
+ */
 struct kmem_cache *
 kmem_cache_create(const char *name, size_t size, size_t align,
 		  unsigned long flags, void (*ctor)(void *))
@@ -699,6 +717,16 @@ void slab_kmem_cache_release(struct kmem_cache *s)
 	kmem_cache_free(kmem_cache, s);
 }
 
+/**
+ * @brief     撤销给定的高速缓存
+ *  该函数通常在模块的注销代码中调用，这里指的是创建自己的高速缓存的模块。
+ *  不能从中断上下文中调用这个函数，因为它可能睡眠。
+ *  调用该函数之前，应该确保：
+ *    1. 高速缓存中所有的slab都必须为空。
+ *    2. 在调用kmem_cache_destory的过程中，不再访问该高速缓存。
+ *
+ * @param      s     { parameter_description }
+ */
 void kmem_cache_destroy(struct kmem_cache *s)
 {
 	LIST_HEAD(release);

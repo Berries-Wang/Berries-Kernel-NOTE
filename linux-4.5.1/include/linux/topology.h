@@ -133,6 +133,10 @@ static inline int node_to_mem_node(int node)
 #endif
 
 #ifndef numa_mem_id
+/**
+ * 返回离Node(NUMA　Node,提高性能)最近的内存的序号，我的猜想
+ * 参考地址:https://blog.csdn.net/yk_wing4/article/details/87474172?depth_1-utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromBaidu-4&utm_source=distribute.pc_relevant.none-task-blog-BlogCommendFromBaidu-4
+ */
 /* Returns the number of the nearest Node with memory */
 static inline int numa_mem_id(void)
 {

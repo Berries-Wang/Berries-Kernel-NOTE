@@ -134,8 +134,19 @@ void __weak arch_release_task_struct(struct task_struct *tsk)
 }
 
 #ifndef CONFIG_ARCH_TASK_STRUCT_ALLOCATOR
+/**
+ * 进程描述符的缓存，如何缓存的？
+ */
 static struct kmem_cache *task_struct_cachep;
 
+
+/**
+ * 创建一个新的进程描述符并返回
+ * Wei.Wang
+ * @DateTime 2020-05-01T20:05:18+0800
+ * @param node 
+ * @return 分配好内存的进程描述符
+ */ 
 static inline struct task_struct *alloc_task_struct_node(int node)
 {
 	return kmem_cache_alloc_node(task_struct_cachep, GFP_KERNEL, node);
@@ -341,6 +352,10 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 {
 	struct task_struct *tsk;
 	struct thread_info *ti;
+	/**
+	*  若使用了NUMA技术,且父进程是kthread_task(Linux 系统2号进程）,
+	   返回父进程的pref_node_fork。否则返回NUMA_NO_NODE(-1)
+	*/
 	int node = tsk_fork_get_node(orig);
 	int err;
 
@@ -1277,6 +1292,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	 * can only be started up within the thread group.
 	 *
 	 * 线程组必须共享信号，并且分离的线程必须在线程组内启动
+
+	 |CLONE_THREAD|父子进程放入相同的线程组|
 	 */
 	if ((clone_flags & CLONE_THREAD) && !(clone_flags & CLONE_SIGHAND))
 		return ERR_PTR(-EINVAL);
