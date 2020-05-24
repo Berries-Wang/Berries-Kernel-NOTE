@@ -273,34 +273,51 @@ struct kmem_cache *find_mergeable(size_t size, size_t align,
 		return NULL;
 	}
 
+    // 为的是内存对齐
 	size = ALIGN(size, sizeof(void *));
+	// 
 	align = calculate_alignment(flags, align, size);
+
 	size = ALIGN(size, align);
+
 	flags = kmem_cache_flags(size, flags, name, NULL);
 
+    // 遍历slab_caches缓存 
 	list_for_each_entry_reverse(s, &slab_caches, list) {
-		if (slab_unmergeable(s))
+		// 缓存不允许复用
+		if (slab_unmergeable(s)){
 			continue;
+		}
 
-		if (size > s->size)
+        // 缓存的对象占用的内存小于要求的size，则放弃该缓存
+		if (size > s->size){
 			continue;
+		}
 
-		if ((flags & SLAB_MERGE_SAME) != (s->flags & SLAB_MERGE_SAME))
+        // 标识不一致，放弃该缓存
+		if ((flags & SLAB_MERGE_SAME) != (s->flags & SLAB_MERGE_SAME)){
 			continue;
+		}
 		/*
 		 * Check if alignment is compatible.
 		 * Courtesy of Adrian Drzewiecki
 		 */
-		if ((s->size & ~(align - 1)) != s->size)
+		// 缓存给对象分配的内存大小与对齐值不符，放弃该缓存
+		if ((s->size & ~(align - 1)) != s->size){
 			continue;
+		}
 
-		if (s->size - size >= sizeof(void *))
+        // 缓存给对象分配的内存大小比特定的size要多出一个字节以上，则放弃该缓存
+		if (s->size - size >= sizeof(void *)){
 			continue;
-
-		if (IS_ENABLED(CONFIG_SLAB) && align &&
-			(align > s->align || s->align % align))
+		}
+        
+        // 如何允许CONFIG_SLAB(目前知识水平还无法解答，待日后补充)，则判断对齐是否一致
+		if (IS_ENABLED(CONFIG_SLAB) && align && (align > s->align || s->align % align)){
 			continue;
-
+		}
+       
+       //  返回缓存，进行缓存的复用
 		return s;
 	}
 	return NULL;
@@ -322,8 +339,9 @@ unsigned long calculate_alignment(unsigned long flags,
 	 */
 	if (flags & SLAB_HWCACHE_ALIGN) {
 		unsigned long ralign = cache_line_size();
-		while (size <= ralign / 2)
+		while (size <= ralign / 2){
 			ralign /= 2;
+		}
 		align = max(align, ralign);
 	}
 

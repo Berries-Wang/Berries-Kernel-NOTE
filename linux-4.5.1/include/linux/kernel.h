@@ -46,6 +46,15 @@
 
 #define REPEAT_BYTE(x)	((~0ul / 0xff) * (x))
 
+/**
+ * @brief      以x为上界对齐，保证内存规整。
+ * 若x为3888，a为4096(4K页)，那么以上界对齐，执行结果就是4096
+ *
+ * @param      x     { parameter_description }
+ * @param      a     { parameter_description }
+ *
+ * @return     { description_of_the_return_value }
+ */
 #define ALIGN(x, a)		__ALIGN_KERNEL((x), (a))
 #define __ALIGN_MASK(x, mask)	__ALIGN_KERNEL_MASK((x), (mask))
 #define PTR_ALIGN(p, a)		((typeof(p))ALIGN((unsigned long)(p), (a)))

@@ -2079,16 +2079,21 @@ __kmem_cache_alias(const char *name, size_t size, size_t align,
 {
 	struct kmem_cache *cachep;
 
+    // 从slab_caches缓存中查找可以共用的slab描述符
 	cachep = find_mergeable(size, align, flags, name, ctor);
+	// 若返回了可以共用的slab描述符
 	if (cachep) {
+		// 缓存的引用计数递增
 		cachep->refcount++;
 
 		/*
 		 * Adjust the object sizes so that we clear
 		 * the complete object on kzalloc.
 		 */
+		// 更新slab描述符缓存的对象的大小，提供给kzalloc使用
 		cachep->object_size = max_t(int, cachep->object_size, size);
 	}
+	// 返回slab描述符
 	return cachep;
 }
 

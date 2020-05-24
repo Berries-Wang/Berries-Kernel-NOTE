@@ -67,9 +67,9 @@ struct kmem_cache {
 	const char *name;
 	// 包含所有缓冲区描述结构的双向循环列表，队列头为slab_caches
 	struct list_head list;
-
+    // slab描述符引用次数？
 	int refcount;
-	
+	// slab描述符缓存的对象所占内存的大小
 	int object_size;
 	// 对齐长度
 	int align;
