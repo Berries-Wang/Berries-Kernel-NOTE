@@ -494,6 +494,10 @@ static void __init mm_init(void)
 	ioremap_huge_init();
 }
 
+
+/**
+ * 内核启动函数
+ */
 asmlinkage __visible void __init start_kernel(void)
 {
 	char *command_line;

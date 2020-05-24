@@ -187,14 +187,15 @@ static bool pfmemalloc_active __read_mostly;
  *
  */
 struct array_cache {
-	// 空闲对象的指针个数
+	// 对象缓冲池中可用的对象数量
 	unsigned int avail;
-	// 栈总长度
+	//  和struct kmen_cache 数据结构中的语义一样
 	unsigned int limit;
-	// 一次向slab中分配、释放对象的个数
+	//  和struct kmen_cache 数据结构中的语义一样
 	unsigned int batchcount;
-	// 最近是否被访问
+	// 从缓冲池中移除一个对象的时候，将touched置为1；收缩缓存时，则将touched置为0；
 	unsigned int touched;
+	// 对象的实体？这里的实体是什么意思？
 	void *entry[];	/*
 			 * Must have this definition in here for the proper
 			 * alignment of array_cache. Also simplifies accessing
@@ -2060,6 +2061,18 @@ unsigned long kmem_cache_flags(unsigned long object_size,
 	return flags;
 }
 
+
+/**
+ * @brief      查找是否有现成的slab描述符可以复用。
+ *
+ * @param[in]  name   The name
+ * @param[in]  size   The size
+ * @param[in]  align  The align
+ * @param[in]  flags  The flags
+ * @param[in]  ctor   The constructor
+ *
+ * @return     { description_of_the_return_value }
+ */
 struct kmem_cache *
 __kmem_cache_alias(const char *name, size_t size, size_t align,
 		   unsigned long flags, void (*ctor)(void *))
@@ -3189,10 +3202,13 @@ slab_alloc_node(struct kmem_cache *cachep, gfp_t flags, int nodeid,
 {
 	unsigned long save_flags;
 	void *ptr;
+	// 返回离Node(NUMA　Node,提高性能)最近的内存的序号
 	int slab_node = numa_mem_id();
 
 	flags &= gfp_allowed_mask;
 
+    // 该函数在 是否定义CONFIG_TRACE_IRQFLAGS(用于调试的?不予考虑) 和 CONFIG_PROVE_LOCKING 时有不同体现。
+    // 没有定义时相当于空函数。
 	lockdep_trace_alloc(flags);
 
 	if (slab_should_failslab(cachep, flags))

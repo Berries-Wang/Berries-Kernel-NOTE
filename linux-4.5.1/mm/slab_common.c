@@ -246,16 +246,32 @@ int slab_unmergeable(struct kmem_cache *s)
 	return 0;
 }
 
+
+/**
+ * @brief      Finds a mergeable.
+ *
+ * @param[in]  size   The size
+ * @param[in]  align  The align
+ * @param[in]  flags  The flags
+ * @param[in]  name   The name
+ * @param[in]  ctor   The constructor
+ *
+ * @return     { description_of_the_return_value }
+ */
 struct kmem_cache *find_mergeable(size_t size, size_t align,
 		unsigned long flags, const char *name, void (*ctor)(void *))
 {
 	struct kmem_cache *s;
 
-	if (slab_nomerge || (flags & SLAB_NEVER_MERGE))
+    // 判断是否允许被共用缓存(是否能和已有的cache合并)，不允许则返回NULL
+	if (slab_nomerge || (flags & SLAB_NEVER_MERGE)){
 		return NULL;
+	}
 
-	if (ctor)
+    // 缓存的对象没有构造函数，直接返回NULL 
+	if (ctor){
 		return NULL;
+	}
 
 	size = ALIGN(size, sizeof(void *));
 	align = calculate_alignment(flags, align, size);
@@ -317,6 +333,20 @@ unsigned long calculate_alignment(unsigned long flags,
 	return ALIGN(align, sizeof(void *));
 }
 
+/**
+ * @brief      创建一个新的slab描述符，创建一个新的缓存
+ *
+ * @param[in]  name         The name
+ * @param[in]  object_size  The object size
+ * @param[in]  size         The size
+ * @param[in]  align        The align
+ * @param[in]  flags        The flags
+ * @param[in]  ctor         The constructor
+ * @param      memcg        The memcg
+ * @param      root_cache   The root cache
+ *
+ * @return     { description_of_the_return_value }
+ */
 static struct kmem_cache *create_cache(const char *name,
 		size_t object_size, size_t size, size_t align,
 		unsigned long flags, void (*ctor)(void *),
@@ -387,8 +417,8 @@ out_free_cache:
  *
  * @param[in]  name   字符串，代表这高速缓存的名字
  * @param[in]  size   高速缓存中每个元素的大小
- * @param[in]  align  slab内第一个对象的偏移，他用来确保在页内进行特定的对齐。通常情况下，0就可以(0代表标准对齐)
- * @param[in]  flags  可选设置项，用来控制高速缓存的行为.可能的值有：
+ * @param[in]  align  缓存对象需要对齐的字节数。slab内第一个对象的偏移，他用来确保在页内进行特定的对齐。通常情况下，0就可以(0代表标准对齐)
+ * @param[in]  flags  分配掩码。 可选设置项，用来控制高速缓存的行为.可能的值有：
  *                    SLAB_HWCACHE_ALIGN:命令slab层把一个slab内的所有对象按高速缓存行对齐，这就防止了错误的共享(两个或者多个对象尽管位于不同的内存地址，但映射到
  *                    相同的缓存行(由上述的英文注释得知，缓存行是硬件中的)中去)。这可以提高性能，但以增加内存开销为代码，因为对齐越严格，消费的内存就越多。(理想的选择)
  *                    SLAB_POISON： 命令slab层使用已知的值(a5a5a5a5)来填充slab，有利于对未初始化内存的访问
@@ -413,7 +443,9 @@ kmem_cache_create(const char *name, size_t size, size_t align,
 
 	mutex_lock(&slab_mutex);
 
+   // 相当于一个钩子函数(仅在内存debug模式下有函数体，其他情况下是一个返回0的空函数)
 	err = kmem_cache_sanity_check(name, size);
+
 	if (err) {
 		goto out_unlock;
 	}

@@ -41,6 +41,16 @@ struct mem_cgroup;
  * allows the use of atomic double word operations on the flags/mapping
  * and lru list pointers also.
  */
+/**
+ * @brief      { 页}
+ * 
+ * 1.  内核把物理页作为内存管理的基本单位
+ * 2.  内核使用struct page结构表示系统中的每一个物理页。
+ * 3.  系统中每个物理页都要分配一个这样的结构体。
+ * 
+ * 需要注意的是：
+ *  a. page 结构与物理页相关，并不是与虚拟页相关
+ */
 struct page {
 	/* First double word block */
 	unsigned long flags;		/* Atomic flags, some possibly
