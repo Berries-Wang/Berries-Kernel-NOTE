@@ -3223,6 +3223,7 @@ again:
 
 /*
  * __schedule() is the main scheduler function.
+ * __schedule() 函数是调度器的主函数
  *
  * The main means of driving the scheduler and thus entering this function are:
  *
@@ -3259,6 +3260,8 @@ again:
  *          - return from interrupt-handler to user-space
  *
  * WARNING: must be called with preemption disabled!
+ * 
+ * @param: preempt 是否抢占
  */
 static void __sched notrace __schedule(bool preempt)
 {
@@ -3361,16 +3364,23 @@ static inline void sched_submit_work(struct task_struct *tsk)
 		blk_schedule_flush_plug(tsk);
 }
 
+/**
+ * 调度程序入口
+ */ 
 asmlinkage __visible void __sched schedule(void)
 {
 	struct task_struct *tsk = current;
 
 	sched_submit_work(tsk);
 	do {
+		// 关闭内核抢占
 		preempt_disable();
+	    // 开始进程进程的调度
 		__schedule(false);
+		// 开启内核抢占
 		sched_preempt_enable_no_resched();
 	} while (need_resched());
+	// need_reched() 若进程(thread_info的flag属性)被设置了TIF_NEED_RESCHED，则重新进行调度
 }
 EXPORT_SYMBOL(schedule);
 

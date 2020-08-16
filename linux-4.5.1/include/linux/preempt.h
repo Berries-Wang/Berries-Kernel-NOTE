@@ -142,12 +142,14 @@ extern void preempt_count_sub(int val);
 
 #ifdef CONFIG_PREEMPT_COUNT
 
+// 关闭内核抢占(task_struct -> thread_info -> preempt_count)
 #define preempt_disable() \
 do { \
 	preempt_count_inc(); \
 	barrier(); \
 } while (0)
 
+// 开启内核抢占(task_struct -> thread_info -> preempt_count)
 #define sched_preempt_enable_no_resched() \
 do { \
 	barrier(); \

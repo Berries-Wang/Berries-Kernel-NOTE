@@ -639,9 +639,10 @@ static void btrfs_wait_for_no_snapshoting_writes(struct btrfs_root *root)
 				TASK_UNINTERRUPTIBLE);
 
 		writers = percpu_counter_sum(&root->subv_writers->counter);
-		if (writers)
+		if (writers){
 			schedule();
-
+		}
+		
 		finish_wait(&root->subv_writers->wait, &wait);
 	} while (writers);
 }
