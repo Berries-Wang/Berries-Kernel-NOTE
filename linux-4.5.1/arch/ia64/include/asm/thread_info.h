@@ -25,6 +25,11 @@ struct thread_info {
 	__u32 last_cpu;			/* Last CPU thread ran on */
 	__u32 status;			/* Thread synchronous flags */
 	mm_segment_t addr_limit;	/* user-level address space limit */
+	/**
+	 * 为了支持内核抢占。该计数器初始值为0，每当使用锁的时候，数值加一。释放锁的时候数值减一。当值为0的时候，内核可以执行抢占
+	 * 。从中断返回内核空间的时候，内核会检查need_resched和peempt_count的值。如果need_resched被设置，且peempt_count为0，就说明
+	 * 有一个更为重要的任务需要执行并且可以安全抢占。此时调度程序就会被调用。若peempt_count不为0，则说明当前任务持有锁，所以抢占就是不安全的。
+	 **/
 	int preempt_count;		/* 0=premptable, <0=BUG; will also serve as bh-counter */
 #ifdef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
 	__u64 ac_stamp;
@@ -92,7 +97,12 @@ struct thread_info {
  *   in top 16 bits
  */
 #define TIF_SIGPENDING		0	/* signal pending */
-#define TIF_NEED_RESCHED	1	/* rescheduling necessary */
+/* rescheduling necessary   标记该进程需要重新调度
+* 当某个进程应该被抢占的时候，scheduler_tick会设置这个标志
+* 当一个优先级高的进程进入可执行状态时，try_to_wake_up也会设置这个标志。
+* 内核检查(内核即将返回用户空间时，或者还有其他时间)这个标志确认其被设置，调用schedule()来切换到一个新的进程
+*/
+#define TIF_NEED_RESCHED	1	
 #define TIF_SYSCALL_TRACE	2	/* syscall trace active */
 #define TIF_SYSCALL_AUDIT	3	/* syscall auditing active */
 #define TIF_SINGLESTEP		4	/* restore singlestep on return to user mode */

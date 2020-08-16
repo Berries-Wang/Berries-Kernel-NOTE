@@ -179,9 +179,13 @@ void sched_init_granularity(void)
 	update_sysctl();
 }
 
-#define WMULT_CONST	(~0U)
+#define WMULT_CONST	(~0U) // -1
 #define WMULT_SHIFT	32
 
+/**
+ * 更新inv_weight
+ * 
+ */ 
 static void __update_inv_weight(struct load_weight *lw)
 {
 	unsigned long w;
@@ -191,12 +195,16 @@ static void __update_inv_weight(struct load_weight *lw)
 
 	w = scale_load_down(lw->weight);
 
-	if (BITS_PER_LONG > 32 && unlikely(w >= WMULT_CONST))
+	if (BITS_PER_LONG > 32 && unlikely(w >= WMULT_CONST)){
 		lw->inv_weight = 1;
-	else if (unlikely(!w))
-		lw->inv_weight = WMULT_CONST;
-	else
-		lw->inv_weight = WMULT_CONST / w;
+	}
+	else if (unlikely(!w)){
+      lw->inv_weight = WMULT_CONST;
+	}		
+	else{
+      lw->inv_weight = WMULT_CONST / w;
+	}
+		
 }
 
 /*
@@ -210,21 +218,29 @@ static void __update_inv_weight(struct load_weight *lw)
  *
  * Or, weight =< lw.weight (because lw.weight is the runqueue weight), thus
  * weight/lw.weight <= 1, and therefore our shift will also be positive.
+ * 
+ * 利用参考权重来计算虚拟时间
+ * 
+ * @param delta_exec: 进程运行时间
+ * @param weignt: 参考权重
+ * @param lw: 该进程的调度实体的权重
  */
 static u64 __calc_delta(u64 delta_exec, unsigned long weight, struct load_weight *lw)
 {
+
 	u64 fact = scale_load_down(weight);
+	// 	WMULT_SHIFT值为32，是为了将除法转换为乘法以及移位操作
 	int shift = WMULT_SHIFT;
 
 	__update_inv_weight(lw);
 
+   // fact >> 32  将fact向右移动32位 
 	if (unlikely(fact >> 32)) {
 		while (fact >> 32) {
 			fact >>= 1;
 			shift--;
 		}
 	}
-
 	/* hint to use a 32x32->64 mul */
 	fact = (u64)(u32)fact * lw->inv_weight;
 
@@ -232,7 +248,14 @@ static u64 __calc_delta(u64 delta_exec, unsigned long weight, struct load_weight
 		fact >>= 1;
 		shift--;
 	}
-
+	/**
+	 * 
+	 * static inline u64 mul_u64_u32_shr(u64 a, u32 mul, unsigned int shift)
+		{
+			return (u64)(((unsigned __int128)a * mul) >> shift);
+		}
+	* 
+	*/
 	return mul_u64_u32_shr(delta_exec, fact, shift);
 }
 
@@ -371,6 +394,9 @@ static inline struct task_struct *task_of(struct sched_entity *se)
 	return container_of(se, struct task_struct, se);
 }
 
+/**
+ *  以cfs_rq(公平运行队列)作为参照物,来计算CPU运行队列，并返回
+ */ 
 static inline struct rq *rq_of(struct cfs_rq *cfs_rq)
 {
 	return container_of(cfs_rq, struct rq, cfs);
@@ -592,11 +618,21 @@ int sched_proc_update_handler(struct ctl_table *table, int write,
 
 /*
  * delta /= w
+ * 使用delta_exec 时间差来计算该进程的虚拟时间vruntime
+ * 
+ * @param delta: 进程已经执行的时长
+ * @param se: 调度器结构实体
  */
 static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
 {
-	if (unlikely(se->load.weight != NICE_0_LOAD))
+	/**
+	 * 判断当前线程的调度实体的权重是否是NICE_0_LOAD(类似参考权重)
+	 * 如果是，则直接使用该delta时间。
+	 */ 
+	if (unlikely(se->load.weight != NICE_0_LOAD)){
+		// 计算公式: (delta * NICE_0_LOAD * inv_weight) >> shift = (delta * NICE_0_LOAD*2^32) >>32
 		delta = __calc_delta(delta, NICE_0_LOAD, &se->load);
+	}
 
 	return delta;
 }
@@ -697,29 +733,53 @@ void init_entity_runnable_average(struct sched_entity *se)
 
 /*
  * Update the current task's runtime statistics.
+ * 更新当前任务的运行时的统计信息
+ * 
+ * @param: cfs_rq 是当前进程对应的CFS就绪队列
+ * 
+ * Q:
+ *   1. 该函数在什么时候会被调用?
+ *       该函数由系统定时器周期性调用的，无论是在进程处于可运行状态还是处于阻塞状态。根据这种方式，vruntime可以准确地测量给定进程的运行时间
+ *       而且可知道谁应该是下一个被运行的进程。
  */
 static void update_curr(struct cfs_rq *cfs_rq)
 {
+	// 获取当前任务的调度器实体结构
 	struct sched_entity *curr = cfs_rq->curr;
+	/**
+	 * 1. 通过cfs_rq来计算CPU的运行队列
+	 * 2. 从运行队列中获取CPU的"时钟任务"
+	 */ 
 	u64 now = rq_clock_task(rq_of(cfs_rq));
 	u64 delta_exec;
 
-	if (unlikely(!curr))
+	if (unlikely(!curr)){
 		return;
-
+	}
+	/**
+	 * 计算该进程从上次调用update_curr到现在的时间差	
+	 * delta_exec:进程从上次调用update_curr函数到现在的时间差
+	 */ 
 	delta_exec = now - curr->exec_start;
 	if (unlikely((s64)delta_exec <= 0))
 		return;
 
+    // 更新当前进程的exec_start字段
 	curr->exec_start = now;
 
+    // 空函数
 	schedstat_set(curr->statistics.exec_max,
 		      max(delta_exec, curr->statistics.exec_max));
 
+    // 更新该进程总的运行时间(下次调度前，上次调度之后)
 	curr->sum_exec_runtime += delta_exec;
-	schedstat_add(cfs_rq, exec_clock, delta_exec);
 
+	// 空函数
+	schedstat_add(cfs_rq, exec_clock, delta_exec);
+       
+	// 计算虚拟运行时间,需要注意的是虚拟运行时间的计算公式
 	curr->vruntime += calc_delta_fair(delta_exec, curr);
+
 	update_min_vruntime(cfs_rq);
 
 	if (entity_is_task(curr)) {

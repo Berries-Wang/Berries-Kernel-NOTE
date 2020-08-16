@@ -359,6 +359,10 @@ struct cfs_bandwidth { };
 /* CFS-related fields in a runqueue */
 struct cfs_rq {
 	struct load_weight load;
+	/**
+	 * nr_runing成员记录CFS就绪队列所有调度实体个数，不包含子就绪队列
+	 * h_nr_running成员记录就绪队列层级上所有调度实体的个数，包含group se对应group cfs_rq上的调度实体
+	 */ 
 	unsigned int nr_running, h_nr_running;
 
 	u64 exec_clock;
@@ -368,6 +372,9 @@ struct cfs_rq {
 #endif
 
 	struct rb_root tasks_timeline;
+	/**
+	 * 缓存，缓存整个红黑树中具有最小vruntime的任务。
+	 */ 
 	struct rb_node *rb_leftmost;
 
 	/*
@@ -409,7 +416,10 @@ struct cfs_rq {
 #endif /* CONFIG_SMP */
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
-	struct rq *rq;	/* cpu runqueue to which this cfs_rq is attached */
+    /* cpu runqueue to which this cfs_rq is attached 
+	* CPU的运行队列 
+	*/
+	struct rq *rq;	
 
 	/*
 	 * leaf cfs_rqs are those that hold tasks (lowest schedulable entity in
@@ -568,14 +578,22 @@ extern struct root_domain def_root_domain;
  * Locking rule: those places that want to lock multiple runqueues
  * (such as the load balancing or the thread migration code), lock
  * acquire operations must be ordered by ascending &runqueue.
+ * 
+ * 这是每一个CPU运行队列(就绪队列)的主要数据结构
+ * 记录了一个就绪队列所需要的全部信息
  */
 struct rq {
-	/* runqueue lock: */
+	/**
+	 *  runqueue lock:
+	 *  保护进程链表的自旋锁
+	 *  */
 	raw_spinlock_t lock;
 
 	/*
 	 * nr_running and cpu_load should be in the same cacheline because
 	 * remote CPUs use both these fields when doing load calculation.
+	 * 
+	 * nr_running: 运行队列(就绪队列)中可运行进程数量
 	 */
 	unsigned int nr_running;
 #ifdef CONFIG_NUMA_BALANCING
@@ -593,12 +611,21 @@ struct rq {
 	unsigned long last_sched_tick;
 #endif
 	/* capture load from *all* tasks on this cpu: */
-	struct load_weight load;
+	struct load_weight load; // 调度器就绪队列的权重
 	unsigned long nr_load_updates;
 	u64 nr_switches;
 
+    /**
+	 * CFS调度器就绪队列
+	 */ 
 	struct cfs_rq cfs;
+	 /**
+	 *  实时进程调度器就绪队列
+	 */ 
 	struct rt_rq rt;
+	 /**
+	 *  deadline调度器就绪队列
+	 */ 
 	struct dl_rq dl;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
@@ -620,6 +647,9 @@ struct rq {
 
 	unsigned int clock_skip_update;
 	u64 clock;
+	/**
+	 * 
+	 */ 
 	u64 clock_task;
 
 	atomic_t nr_iowait;

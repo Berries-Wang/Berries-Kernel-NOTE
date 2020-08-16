@@ -1186,8 +1186,16 @@ struct mempolicy;
 struct pipe_inode_info;
 struct uts_namespace;
 
+
+/**
+ * 
+ * 负荷权重用struct load_weight数据结构来表示, 保存着进程权重值weight
+ * 
+ */ 
 struct load_weight {
+	// 存储了权重的信息
 	unsigned long weight;
+	// 存储了权重值用于重除的结果 weight * inv_weight = 2^32.(inverse(倒数) weight简写)
 	u32 inv_weight;
 };
 
@@ -1253,9 +1261,21 @@ struct sched_entity {
 	struct list_head	group_node;
 	unsigned int		on_rq;
 
+    /**
+	 * 上次update_curr()函数执行时间
+	 */ 
 	u64			exec_start;
+	/**
+	 * 进程总共执行的实际时间(上一次调度后的,下一次调度之前)
+	 */ 
 	u64			sum_exec_runtime;
+	/**
+	 * 进程的虚拟运行时间。该运行时间(花在运行上的时间和)的计算是经过了所有可运行进程总数的标准化(或者说是被加权了)
+	 */ 
 	u64			vruntime;
+	/**
+	 * 指上次该进程被调度时已经占用的实际时间
+	 */ 
 	u64			prev_sum_exec_runtime;
 
 	u64			nr_migrations;
@@ -1387,7 +1407,10 @@ struct tlbflush_unmap_batch {
 };
 
 struct task_struct {
-	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
+     /**
+	  * 进程当前的状态
+	  *  -1 unrunnable, 0 runnable, >0 stopped */
+	volatile long state;	
 	void *stack;
 	atomic_t usage;
 	unsigned int flags;	/* per process flags, defined below */
@@ -1395,6 +1418,7 @@ struct task_struct {
 
 #ifdef CONFIG_SMP
 	struct llist_node wake_entry;
+    // 标识进程是否在CPU上运行(1:正在运行或者即将运行;0:退出了运行状态)
 	int on_cpu;
 	unsigned int wakee_flips;
 	unsigned long wakee_flip_decay_ts;
@@ -1404,8 +1428,28 @@ struct task_struct {
 #endif
 	int on_rq;
 
-	int prio, static_prio, normal_prio;
+    /**
+	 * 进程的动态优先级，是调度器类考虑的优先级。
+	 */ 
+	int prio;
+	/**
+	 *  静态优先级(内核不存储nice值),内核中使用宏NICE_TO_PRIO()实现由nice值转换为static_prio.且不会随着时间的改变而改变。
+	 * 用户可以通过nice()或者sched_setscheduler等系统调用来修改该值
+	 */ 
+	int static_prio;
+	/**
+	 * 基于static_prio和调度策略计算出来的优先级，在创建进程的时候会继承父进程的normal_prio.
+	 * 
+	 * 对于普通进程，normal_prio和static_prio一致；
+	 * 对于实时进程，会根据rt_priority重新计算normal_prio.(effective_prio()函数)
+	 */ 
+	int normal_prio;
+
+	/**
+	 * 实时进程的优先级
+	 */ 
 	unsigned int rt_priority;
+
 	const struct sched_class *sched_class;
 	struct sched_entity se;
 	struct sched_rt_entity rt;
@@ -1422,9 +1466,20 @@ struct task_struct {
 #ifdef CONFIG_BLK_DEV_IO_TRACE
 	unsigned int btrace_seq;
 #endif
-
+    
+	/**
+	 * 进程的调度类型
+	 * SCHED_NORMAL: 普通的分时进程
+	 * SCHED_RR: 时间片轮转的实时进程
+	 * SCHED_FIFO: 先进先出的实时进程
+	 */ 
 	unsigned int policy;
 	int nr_cpus_allowed;
+	/**
+	 * CPU位掩码标志
+	 * 该掩码标志的每一位对应一个系统可用的处理器。默认情况下，所有的位都被设置，进程可以在系统中所有可用的处理器上执行。
+	 * 用户可以调用sched_setaffinity()设置不同的一个或几个组合的位掩码。调用sched_getaffinity()则返回当前的cpus_allowed位掩码
+	 */
 	cpumask_t cpus_allowed;
 
 #ifdef CONFIG_PREEMPT_RCU
@@ -1450,6 +1505,14 @@ struct task_struct {
 	struct rb_node pushable_dl_tasks;
 #endif
 
+    /**
+	 * 1. 对于普通进程来说,mm和active_mm都指向进程的地址空间描述符mm_sruct;
+	 * 2. 对于内核进程来说，是没有进程地址空间的(mm为NULL)
+	 * 3. 因为进程调度的需要,需要借用一个进程的地址空间，因此有了active_mm成员(内核要求所有进程都需要一个mm_struct结构)。
+	 * 
+	 * 《深入理解LINUX内核》 P357
+	 * mm指进程所拥有的内存描述符，active_mm则是指进程运行时使用的内存描述符
+	 */ 
 	struct mm_struct *mm, *active_mm;
 	/* per-thread vma caching */
 	u32 vmacache_seqnum;
@@ -1582,9 +1645,9 @@ struct task_struct {
 	struct fs_struct *fs;
 /* open file information */
 	struct files_struct *files;
-      /* namespaces
-         由nsproxy来统一维护该进程所属的命名空间
-       */
+    /** namespaces
+    *   由nsproxy来统一维护该进程所属的命名空间
+    */
 	struct nsproxy *nsproxy;
 /* signal handlers */
 	struct signal_struct *signal;
@@ -2444,6 +2507,7 @@ extern void set_curr_task(int cpu, struct task_struct *p);
 void yield(void);
 
 union thread_union {
+	// arch\ia64\include\asm\thread_info.h
 	struct thread_info thread_info;
 	unsigned long stack[THREAD_SIZE/sizeof(long)];
 };

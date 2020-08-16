@@ -2675,12 +2675,17 @@ static struct rq *finish_task_switch(struct task_struct *prev)
 	prev_state = prev->state;
 	vtime_task_switch(prev);
 	perf_event_task_sched_in(prev, current);
+	// 将task_struct的on_cpu成员设置为0，表示pre进程已经退出了执行状态
 	finish_lock_switch(rq, prev);
 	finish_arch_post_lock_switch();
 
 	fire_sched_in_preempt_notifiers(current);
-	if (mm)
+
+	if (mm){
+		// 内存描述符引用计数减1，在context_switch函数中增的1
 		mmdrop(mm);
+	}
+
 	if (unlikely(prev_state == TASK_DEAD)) {
 		if (prev->sched_class->task_dead)
 			prev->sched_class->task_dead(prev);
@@ -2760,8 +2765,18 @@ asmlinkage __visible void schedule_tail(struct task_struct *prev)
 		put_user(task_pid_vnr(current), current->set_child_tid);
 }
 
-/*
+/**
  * context_switch - switch to the new MM and the new thread's register state.
+ * 上下文切换，即 从一个可执行的进程切换到另外一个可执行的进程
+ *     当一个新的进程被选出来准备投入运行，schedule()就会调用该函数
+ * 
+ * 上下文切换步骤:
+ *   Step1:(内存)调用函数switch_mm(),负责将虚拟内存从上一个进程映射切换到新进程中
+ *   Step2:(处理器)调用函数switch_to(),负责将上一个进程的处理器状态切换到新进程的处理器状态(包括 保存、恢复栈信息以及寄存器信息)
+ * 
+ * @param rq: 进程切换所在的就绪队列
+ * @param prev: 将要被换出的进程
+ * @param next: 将要被换入执行的进程
  */
 static inline struct rq *
 context_switch(struct rq *rq, struct task_struct *prev,
@@ -2769,6 +2784,7 @@ context_switch(struct rq *rq, struct task_struct *prev,
 {
 	struct mm_struct *mm, *oldmm;
 
+    // 内部调用prepare_lock_switch 设置next进程的task_struct结构中的成员变量on_cpu为1，表示next进程马上要进入执行状态
 	prepare_task_switch(rq, prev, next);
 
 	mm = next->mm;
@@ -2780,15 +2796,32 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	 */
 	arch_start_context_switch(prev);
 
+    /**
+	 * 如果next进程是内核进程(next->mm 为NULL)
+	 */ 
 	if (!mm) {
+		/**
+		 * next进程为内核进程，借用prev->active_mm,因为prev进程也可能是内核进程，内核进程的mm为NULL。
+		 * Q: 进程的切换active_mm一定不能为空吗?
+		 */ 
 		next->active_mm = oldmm;
+		// 增加prev->active_mm的引用计数
 		atomic_inc(&oldmm->mm_count);
+		// 进入lazy_tlb模式???
 		enter_lazy_tlb(oldmm, next);
-	} else
-		switch_mm(oldmm, mm, next);
-
+	} else{
+		/**
+		 * 进程内存的切换
+		 */ 
+        switch_mm(oldmm, mm, next);
+	}
+		
+	/**
+	 * 如果prev是内核进程，把执行prev内存描述符指针保存到就绪队列的prev_mm字段中，并且重新设置prev->active_mm
+	 */ 	
 	if (!prev->mm) {
 		prev->active_mm = NULL;
+		// 猜测(2020-08-16):这里保存仅仅是为了内核进程的调度
 		rq->prev_mm = oldmm;
 	}
 	/*
@@ -2800,10 +2833,16 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	lockdep_unpin_lock(&rq->lock);
 	spin_release(&rq->lock.dep_map, 1, _THIS_IP_);
 
-	/* Here we just switch the register state and the stack. */
+	/**
+	 * Here we just switch the register state and the stack.
+	 * 切换堆栈和硬件上下文。
+	 * 
+	 * switch_to宏执行完成之后的代码有谁执行？
+	 * 详见:《深入理解LINUX内核(第三版)》 P110，P283
+	 **/
 	switch_to(prev, next, prev);
 	barrier();
-
+    // 下面的操作是next进程完成的了，因为现在进程已经切换完成了。
 	return finish_task_switch(prev);
 }
 
@@ -2958,6 +2997,8 @@ unsigned long long task_sched_runtime(struct task_struct *p)
 /*
  * This function gets called by the timer code, with HZ frequency.
  * We call it with interrupts disabled.
+ * 
+ * 每次时钟节拍到来时，该函数都会被调用
  */
 void scheduler_tick(void)
 {
@@ -3125,6 +3166,8 @@ static inline void schedule_debug(struct task_struct *prev)
 
 /*
  * Pick up the highest-prio task:
+ * 
+ * 选出最高级别的任务
  */
 static inline struct task_struct *
 pick_next_task(struct rq *rq, struct task_struct *prev)
@@ -3135,6 +3178,10 @@ pick_next_task(struct rq *rq, struct task_struct *prev)
 	/*
 	 * Optimization: we know that if all tasks are in
 	 * the fair class we can call that function directly:
+	 * 
+	 * 优化:我们知道如果所有的任务都在公平类中，那么我们就可以直接调用那个函数。
+	 * 如果进程的调度器类是公平调度器类且CPU就绪队列中的任务数量等于CFS调度器就绪队列中的任务数量，于是，便可以说明所有的可运行进程都是CFS类的
+	 * 
 	 */
 	if (likely(prev->sched_class == class &&
 		   rq->nr_running == rq->cfs.h_nr_running)) {
@@ -3142,13 +3189,21 @@ pick_next_task(struct rq *rq, struct task_struct *prev)
 		if (unlikely(p == RETRY_TASK))
 			goto again;
 
-		/* assumes fair_sched_class->next == idle_sched_class */
-		if (unlikely(!p))
+		/* assumes fair_sched_class->next == idle_sched_class 
+		*   
+		*/
+		if (unlikely(!p)){
 			p = idle_sched_class.pick_next_task(rq, prev);
+		}
 
 		return p;
 	}
 
+    /**
+	 * 从for_each_class宏来看
+	 * 1. 首先将class赋值为sched_class_highest
+	 * 2. 在对调度器类进行遍历。
+	 */ 
 again:
 	for_each_class(class) {
 		p = class->pick_next_task(rq, prev);
@@ -3158,8 +3213,12 @@ again:
 			return p;
 		}
 	}
+    /* 
+	 * the idle class will always have a runnable task
+	 * 永远不会为NULL，因为idle类总会返回非NULL的进程
+	 *  */
 
-	BUG(); /* the idle class will always have a runnable task */
+	BUG(); 
 }
 
 /*
@@ -8733,6 +8792,10 @@ void dump_cpu_task(int cpu)
  * If a task goes up by ~10% and another task goes down by ~10% then
  * the relative distance between them is ~25%.)
  */
+
+/**
+ * nice值和权重值对应表
+ */ 
 const int sched_prio_to_weight[40] = {
  /* -20 */     88761,     71755,     56483,     46273,     36291,
  /* -15 */     29154,     23254,     18705,     14949,     11916,
@@ -8751,6 +8814,11 @@ const int sched_prio_to_weight[40] = {
  * precalculated inverse to speed up arithmetics by turning divisions
  * into multiplications:
  */
+
+/**
+ * 计算公式= (2^32)/weight;
+ * 主要是计算方便，提前将相关值计算出来
+ */ 
 const u32 sched_prio_to_wmult[40] = {
  /* -20 */     48388,     59856,     76040,     92818,    118348,
  /* -15 */    147320,    184698,    229616,    287308,    360437,
