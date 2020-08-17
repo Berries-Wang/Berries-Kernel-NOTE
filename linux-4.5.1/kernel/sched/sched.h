@@ -641,17 +641,30 @@ struct rq {
 	 */
 	unsigned long nr_uninterruptible;
 
+	/**
+	 *  curr: 当前正在运行的进程的进程描述符指针，对本次CPU而言，与current一样
+	 *  idle: 指向属于idle-task scheduling class 的idle task;
+	 *  stop: 指向目前最高等级属于stop-task scheduling class的task;
+	 */ 
 	struct task_struct *curr, *idle, *stop;
 	unsigned long next_balance;
+	// prev_mm 存放进程切换期间被替换掉的进程的内存描述符
 	struct mm_struct *prev_mm;
 
+    // 是否需要更新rq的运行时间 
 	unsigned int clock_skip_update;
+	/**
+	 * 记录物理时间 ?
+	 */ 
 	u64 clock;
 	/**
-	 * 
+	 * 记录task运行的物理时间 ?
 	 */ 
 	u64 clock_task;
 
+	/**
+	 *  先前在运行队列中，现在正在等磁盘I/O操作结束的进程的数量
+	 */ 
 	atomic_t nr_iowait;
 
 #ifdef CONFIG_SMP
@@ -668,7 +681,10 @@ struct rq {
 	int active_balance;
 	int push_cpu;
 	struct cpu_stop_work active_balance_work;
-	/* cpu of this runqueue: */
+	/**
+	 *  cpu of this runqueue:
+	 * 这个运行队列对应的CPU(即这个运行队列是哪个CPU上的)
+	 *  */
 	int cpu;
 	int online;
 

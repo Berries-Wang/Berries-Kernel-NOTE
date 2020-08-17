@@ -96,19 +96,30 @@ DEFINE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);
 
 static void update_rq_clock_task(struct rq *rq, s64 delta);
 
+
+/**
+ * 更新当前CPU就绪队列rq中的时钟计数器clock&clock_task
+ * @param rq: CPU对应的运行队列
+ */ 
 void update_rq_clock(struct rq *rq)
 {
 	s64 delta;
 
 	lockdep_assert_held(&rq->lock);
 
-	if (rq->clock_skip_update & RQCF_ACT_SKIP)
+	if (rq->clock_skip_update & RQCF_ACT_SKIP){
 		return;
-
+	}
+		
 	delta = sched_clock_cpu(cpu_of(rq)) - rq->clock;
-	if (delta < 0)
+
+	if (delta < 0){
 		return;
+	}
+
+	// 更新clock字段	
 	rq->clock += delta;
+	// 更新clock_task字段
 	update_rq_clock_task(rq, delta);
 }
 
@@ -3002,17 +3013,24 @@ unsigned long long task_sched_runtime(struct task_struct *p)
  */
 void scheduler_tick(void)
 {
+	// 获取当前CPU的id
 	int cpu = smp_processor_id();
+	// 获取指定CPU上的运行队列
 	struct rq *rq = cpu_rq(cpu);
+	// 从运行队列中获取当前进程的进程描述符
 	struct task_struct *curr = rq->curr;
 
+    // 一个空函数
 	sched_clock_tick();
 
+    // 使用自旋锁对运行队列进行加锁
 	raw_spin_lock(&rq->lock);
+	// 更新运行队列的clock,clock_task字段
 	update_rq_clock(rq);
 	curr->sched_class->task_tick(rq, curr, 0);
 	update_cpu_load_active(rq);
 	calc_global_load_tick(rq);
+	// 运行队列解锁操作
 	raw_spin_unlock(&rq->lock);
 
 	perf_event_task_tick();
