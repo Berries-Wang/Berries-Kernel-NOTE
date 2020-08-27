@@ -3134,7 +3134,7 @@ void preempt_count_sub(int val)
 EXPORT_SYMBOL(preempt_count_sub);
 NOKPROBE_SYMBOL(preempt_count_sub);
 
-#endif
+#endif    
 
 /*
  * Print scheduling while atomic bug:

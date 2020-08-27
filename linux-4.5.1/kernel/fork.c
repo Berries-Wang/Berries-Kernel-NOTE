@@ -1271,21 +1271,29 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	int retval;
 	struct task_struct *p;
 
-	/**
-	 * |CLONE_FS|父子进程共享文件系统信息|
-     * |CLONE_NEWNS|为子进程创建新的命名空间|
-	 */
-	 // 命名空间和文件系统的关系是1:1的?,即一个命名空间绑定且只会绑定一个文件系统(猜测阶段)
-	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
+	 /**
+	  * CLONE_FS|父子进程共享文件系统信息,例如共享根目录,当前工作目录等。其中一个进程对文件系统信息进行修改，将会影响到另外一个进程
+	  * CLONE_NEWNS|表示父子进程不共享mount namespace.每个进程都可以拥有自己的mount namespace
+	  * 
+	  * 因此，CLONE_NEWNS 和 CLONE_FS矛盾了
+	  */ 
+	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS)){
 		// ERR_PTR定义于include/linux/err.h文件中
 		// EINVAL 定义于include/uapi/asm-generic/errno-base.h文件中，意味无效的参数
 		return ERR_PTR(-EINVAL);
+	}
+		
 
 	/**
-	 * |CLONE_NEWUSER|New user namespace(指定子进程拥有新的用户空间)|
+	 * |CLONE_NEWUSER|表示子进程要创建新的User Namespace，User Namespace用于管理User ID 和 GroupID的映射的作用。
+	 *                一个User Namespace 可以形成一个容器，容器里第一个进程uid为0，即root用户。但是容器里面的root用户并不具备系统root权限。
+	 * 
+	 * 因此，CLONE_NEWUSER与CLONE_FS矛盾
 	 */
-	if ((clone_flags & (CLONE_NEWUSER|CLONE_FS)) == (CLONE_NEWUSER|CLONE_FS))
+	if ((clone_flags & (CLONE_NEWUSER|CLONE_FS)) == (CLONE_NEWUSER|CLONE_FS)){
 		return ERR_PTR(-EINVAL);
+	}
+		
 
 	/*
 	 * Thread groups must share signals as well(此外), and detached threads
@@ -1295,8 +1303,10 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	 |CLONE_THREAD|父子进程放入相同的线程组|
 	 */
-	if ((clone_flags & CLONE_THREAD) && !(clone_flags & CLONE_SIGHAND))
+	if ((clone_flags & CLONE_THREAD) && !(clone_flags & CLONE_SIGHAND)){
 		return ERR_PTR(-EINVAL);
+	}
+		
 
 	/*
 	 * Shared signal handlers imply shared VM(代表virtual memory). By way of the above,
@@ -1305,10 +1315,17 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	 *
 	 * 共享信号处理函数代表着共享内存，通过上述方式，线程组也代表着需要共享内存。阻止这种情况是为了简化其他的代码
 	 */
-	if ((clone_flags & CLONE_SIGHAND) && !(clone_flags & CLONE_VM))
+	if ((clone_flags & CLONE_SIGHAND) && !(clone_flags & CLONE_VM)){
 		return ERR_PTR(-EINVAL);
+	}
+		
 
-	/*
+	/**
+	 * 
+	 * CLONE_PARENT 代表新创建的进程是兄弟关系，而不是父子关系。他们拥有相同的父进程。对于Linux内核来说，进程的鼻祖是idle进程，也叫swagger进程；
+	 * 但对用户进程来说，进程的鼻祖是init进程，所有用户空间的进程都有init进程创建和派生。只有init进程才会设置SIGNAL_UNKILLABLE标志位。如果init进程或者容器init
+	 * 进程要使用CLONE_PARENT来创建兄弟进程，则该进程无法由init进程回收，父进程idle进程也无能为力，因此他们会成为僵尸进程。
+	 * 
 	 * Siblings of global init remain as zombies on exit since they are
 	 * not reaped(取得，收割) by their parent (swapper). To solve this and to avoid
 	 * multi-rooted process trees,signal_struct prevent global and container-inits
@@ -1323,28 +1340,29 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	 *
 	 */
 	if ((clone_flags & CLONE_PARENT) &&
-				current->signal->flags & SIGNAL_UNKILLABLE)
-		return ERR_PTR(-EINVAL);
+				current->signal->flags & SIGNAL_UNKILLABLE){
+					return ERR_PTR(-EINVAL);
+				}
+		
 
 	/*
 	 * If the new process will be in a different pid or user namespace
 	 * do not allow it to share a thread group with the forking task.
 	 *
-	 * CLONE_THREAD： 父子进程放入相同的进程组
-	 * CLONE_NEWUSER: 指定子进程拥有新的用户空间
+	 * CLONE_THREAD： 表示父子进程在同一个线程组内
+	 * CLONE_NEWUSER: 表示子进程将创建新的User Namespace
 	 * CLONE_NEWPID: 指定子进程拥有新的pid命名空间
 	 *
 	 * task_active_pid_ns:函数原型在/kernel/pid.c中,
 	 */
 	if (clone_flags & CLONE_THREAD) {
-	    /**
-	     * 猜想：
-	     *    a. 进程组内的所有进程的pid空间和用户空间是一样的
-	     */
+	   
 		if ((clone_flags & (CLONE_NEWUSER | CLONE_NEWPID)) ||
 		    (task_active_pid_ns(current) !=
-				current->nsproxy->pid_ns_for_children))
-			return ERR_PTR(-EINVAL);
+				current->nsproxy->pid_ns_for_children)){
+					return ERR_PTR(-EINVAL);
+				}
+			
 	}
 
 	/**
@@ -1352,9 +1370,11 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	 * 安放钩子(即回调函数,可以实现,即使用自己的策略)来进行安全验证,安全管理等操作
 	 */
 	retval = security_task_create(clone_flags);
-	if (retval)
-		goto fork_out;
 
+	if (retval){
+		goto fork_out;
+	}
+		
 	retval = -ENOMEM;
 	p = dup_task_struct(current);
 	if (!p)
@@ -1749,9 +1769,9 @@ struct task_struct *fork_idle(int cpu)
  */
 /**
  *
- * @param clone_flags  标识需要从父进程中继承哪些资源
+ * @param clone_flags  标识需要从父进程中继承哪些资源,即创建进程的标志位集合
  * @param stack_start  **子进程**在用户态的堆栈地址
- * @param stack_size  子进程在用户态堆栈大小
+ * @param stack_size  子进程在用户态堆栈大小,通常为0
  * @param __user parent_tidptr 父进程在用户态下的pid地址
  * @param __user child_tidptr 子进程在用户态下的pid地址
  * @param tls
