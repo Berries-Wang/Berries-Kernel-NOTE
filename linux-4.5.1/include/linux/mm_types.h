@@ -397,8 +397,13 @@ struct mm_rss_stat {
 };
 
 struct kioctx_table;
+/**
+ * 虚拟内存抽象
+ */ 
 struct mm_struct {
+	// 进程中VMA链表的表头
 	struct vm_area_struct *mmap;		/* list of VMAs */
+	// VMA红黑树的根
 	struct rb_root mm_rb;
 	u32 vmacache_seqnum;                   /* per-thread vmacache */
 #ifdef CONFIG_MMU
@@ -411,7 +416,9 @@ struct mm_struct {
 	unsigned long task_size;		/* size of task vm space */
 	unsigned long highest_vm_end;		/* highest vma end address */
 	pgd_t * pgd;
+	// 表示在用户空间的用户个数
 	atomic_t mm_users;			/* How many users with user space? */
+	// 表示内核中引用了该数据结构的个数
 	atomic_t mm_count;			/* How many references to "struct mm_struct" (users count as 1) */
 	atomic_long_t nr_ptes;			/* PTE page table pages */
 #if CONFIG_PGTABLE_LEVELS > 2
@@ -420,6 +427,7 @@ struct mm_struct {
 	int map_count;				/* number of VMAs */
 
 	spinlock_t page_table_lock;		/* Protects page tables and some counters */
+	// 用于保护进程地址空间的读写信号量
 	struct rw_semaphore mmap_sem;
 
 	struct list_head mmlist;		/* List of maybe swapped mm's.	These are globally strung

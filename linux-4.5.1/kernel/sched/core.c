@@ -957,6 +957,7 @@ void sched_set_stop_task(int cpu, struct task_struct *stop)
 
 /*
  * __normal_prio - return the priority that is based on the static prio
+ * 返回进程的静态优先级
  */
 static inline int __normal_prio(struct task_struct *p)
 {
@@ -2296,36 +2297,57 @@ int sysctl_numa_balancing(struct ctl_table *table, int write,
 /*
  * fork()/clone()-time setup:
  */
+/**
+ * @param clone_flags: 
+ * @param p: 进程描述符指针
+ * 
+ * 
+ */ 
 int sched_fork(unsigned long clone_flags, struct task_struct *p)
 {
 	unsigned long flags;
+	// 获取当前CPU的ID
 	int cpu = get_cpu();
 
+	/**
+	 *  初始化进程调度相关的数据结构
+	 * 
+	 */ 
 	__sched_fork(clone_flags, p);
 	/*
 	 * We mark the process as running here. This guarantees that
 	 * nobody will actually run it, and a signal or other external
 	 * event cannot wake it up and insert it on the runqueue either.
+	 * 
+	 * 将进程状态修改为运行状态，但是进程现在还没有开始运行，因为目前还没有加入运行队列，并且外部的事件或信号不能将它唤醒
 	 */
 	p->state = TASK_RUNNING;
 
 	/*
 	 * Make sure we do not leak PI boosting priority to the child.
+	 * 进程动态优先级设置,详见 struct task_struct;
 	 */
 	p->prio = current->normal_prio;
 
 	/*
 	 * Revert to default priority/policy on fork if requested.
+	 * 判断是否需要恢复到默认的优先级以及调度策略
 	 */
 	if (unlikely(p->sched_reset_on_fork)) {
 		if (task_has_dl_policy(p) || task_has_rt_policy(p)) {
+			// 设置进程的调度类型
 			p->policy = SCHED_NORMAL;
+			// 进程的静态优先级
 			p->static_prio = NICE_TO_PRIO(0);
+			// 进程的实时优先级
 			p->rt_priority = 0;
-		} else if (PRIO_TO_NICE(p->static_prio) < 0)
+		} else if (PRIO_TO_NICE(p->static_prio) < 0){
 			p->static_prio = NICE_TO_PRIO(0);
+		}
 
+		// 将进程动态优先级	normal_prio设置为进程的静态优先级
 		p->prio = p->normal_prio = __normal_prio(p);
+		// 设置进程的权重
 		set_load_weight(p);
 
 		/*
@@ -2344,8 +2366,11 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 		p->sched_class = &fair_sched_class;
 	}
 
-	if (p->sched_class->task_fork)
+	if (p->sched_class->task_fork){
+		// 调用task_fork函数对调度类做初始化动作
 		p->sched_class->task_fork(p);
+	}
+	
 
 	/*
 	 * The child is not yet in the pid-hash so no cgroup attach races,
@@ -2355,6 +2380,7 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 	 * Silence PROVE_RCU.
 	 */
 	raw_spin_lock_irqsave(&p->pi_lock, flags);
+	// 设置thread_info->cpu以及task_struct->wakeup_cpu
 	set_task_cpu(p, cpu);
 	raw_spin_unlock_irqrestore(&p->pi_lock, flags);
 
@@ -2365,12 +2391,13 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 #if defined(CONFIG_SMP)
 	p->on_cpu = 0;
 #endif
+    // 初始化thread_info->preempt_count
 	init_task_preempt_count(p);
 #ifdef CONFIG_SMP
 	plist_node_init(&p->pushable_tasks, MAX_PRIO);
 	RB_CLEAR_NODE(&p->pushable_dl_tasks);
 #endif
-
+    // 允许内核抢占
 	put_cpu();
 	return 0;
 }

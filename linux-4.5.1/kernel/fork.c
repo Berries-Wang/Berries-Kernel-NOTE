@@ -344,9 +344,9 @@ void set_task_stack_end_magic(struct task_struct *tsk)
 
 /**
  *
- * 为新进程创建内核栈
- * @param orig
- * @return
+ * 为新进程创建进程描述符
+ * @param orig 父进程的进程描述符
+ * @return 为新进程分配的进程描述符
  */
 static struct task_struct *dup_task_struct(struct task_struct *orig)
 {
@@ -359,18 +359,23 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	int node = tsk_fork_get_node(orig);
 	int err;
 
+    // 分配一个task_struct
 	tsk = alloc_task_struct_node(node);
-	if (!tsk)
+	if (!tsk){
 		return NULL;
+	}
 
+	// 分配一个thread_info结构,该结构用来存储进程描述符频繁访问和硬件快速访问的字段
 	ti = alloc_thread_info_node(tsk, node);
-	if (!ti)
+	if (!ti){
 		goto free_tsk;
-
+	}
+	// 将父进程task_struct结构中的数据复制到子进程task_struct结构中
 	err = arch_dup_task_struct(tsk, orig);
-	if (err)
+	if (err){
 		goto free_ti;
-
+	}	
+    // 将子进程的stack字段指向ti  
 	tsk->stack = ti;
 #ifdef CONFIG_SECCOMP
 	/*
@@ -382,8 +387,10 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	tsk->seccomp.filter = NULL;
 #endif
 
+    // 1. 将orig中的stack复制到tsk中   2. 复制完成之后，将tsk里stack字段中的task字段指向tsk
 	setup_thread_stack(tsk, orig);
 	clear_user_return_notifier(tsk);
+	// 清除thread_info->flags中的TIF_NEED_RESCHED,因为新进程还没有完全诞生，还不能被调度
 	clear_tsk_need_resched(tsk);
 	set_task_stack_end_magic(tsk);
 
@@ -406,7 +413,7 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	account_kernel_stack(ti, 1);
 
 	return tsk;
-
+// 内存分配失败,释放内存
 free_ti:
 	free_thread_info(ti);
 free_tsk:
@@ -605,6 +612,10 @@ static void mm_init_owner(struct mm_struct *mm, struct task_struct *p)
 #endif
 }
 
+/**
+ * 对mm进行初始化操作
+ * 
+ */ 
 static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p)
 {
 	mm->mmap = NULL;
@@ -639,12 +650,17 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p)
 		mm->def_flags = 0;
 	}
 
-	if (mm_alloc_pgd(mm))
+   /**
+	* 为struct mm_struct分配PGD页表,与体系结构有关,不同的体系有不同的实现
+	*/ 
+	if (mm_alloc_pgd(mm)){
 		goto fail_nopgd;
-
-	if (init_new_context(p, mm))
+	}
+		
+	if (init_new_context(p, mm)){
 		goto fail_nocontext;
-
+	}
+		
 	return mm;
 
 fail_nocontext:
@@ -929,30 +945,38 @@ void mm_release(struct task_struct *tsk, struct mm_struct *mm)
 /*
  * Allocate a new mm structure and copy contents from the
  * mm structure of the passed in task structure.
+ * 
+ * 分配一个新的struct mm_struct ,将struct task_struct中的mm复制到新的mm_struct中
  */
 static struct mm_struct *dup_mm(struct task_struct *tsk)
 {
 	struct mm_struct *mm, *oldmm = current->mm;
 	int err;
 
+    // 分配一个struct mm_struct
 	mm = allocate_mm();
-	if (!mm)
+	if (!mm){
 		goto fail_nomem;
-
+	}
+	
+	// 内存复制,将父进程的mm_struct复制到新创建的mm_struct
 	memcpy(mm, oldmm, sizeof(*mm));
-
-	if (!mm_init(mm, tsk))
+    // 使用mm_init函数对struct mm_struct结构进行初始化操作
+	if (!mm_init(mm, tsk)){
 		goto fail_nomem;
+	}
 
 	err = dup_mmap(mm, oldmm);
-	if (err)
+	if (err){
 		goto free_pt;
-
+	}
+		
 	mm->hiwater_rss = get_mm_rss(mm);
 	mm->hiwater_vm = mm->total_vm;
 
-	if (mm->binfmt && !try_module_get(mm->binfmt->module))
+	if (mm->binfmt && !try_module_get(mm->binfmt->module)){
 		goto free_pt;
+	}	
 
 	return mm;
 
@@ -985,12 +1009,14 @@ static int copy_mm(unsigned long clone_flags, struct task_struct *tsk)
 	 * We need to steal a active VM for that..
 	 */
 	oldmm = current->mm;
-	if (!oldmm)
+	if (!oldmm){
 		return 0;
-
+	}
+		
 	/* initialize the new vmacache entries */
 	vmacache_flush(tsk);
 
+    // 如果父进程和子进程运行在同一个虚拟地址空间(CLONE_VM),则子进程使用父进程的虚拟地址空间
 	if (clone_flags & CLONE_VM) {
 		atomic_inc(&oldmm->mm_users);
 		mm = oldmm;
@@ -998,10 +1024,12 @@ static int copy_mm(unsigned long clone_flags, struct task_struct *tsk)
 	}
 
 	retval = -ENOMEM;
+	// 给子进程分配一个mm数据结构
 	mm = dup_mm(tsk);
-	if (!mm)
+	if (!mm){
 		goto fail_nomem;
-
+	}
+		
 good_mm:
 	tsk->mm = mm;
 	tsk->active_mm = mm;
@@ -1376,9 +1404,11 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	}
 		
 	retval = -ENOMEM;
+	// 为新进程分配进程描述符(task_struct)
 	p = dup_task_struct(current);
-	if (!p)
-		goto fork_out;
+	if (!p){
+	   goto fork_out;
+	}
 
 	ftrace_graph_init_task(p);
 
@@ -1397,24 +1427,40 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	}
 	current->flags &= ~PF_NPROC_EXCEEDED;
 
+    // 复制父进程的证书
 	retval = copy_creds(p, clone_flags);
-	if (retval < 0)
+	if (retval < 0){
 		goto bad_fork_free;
-
+	}
+		
 	/*
 	 * If multiple threads are within copy_process(), then this check
 	 * triggers too late. This doesn't hurt, the check is only there
 	 * to stop root fork bombs.
 	 */
 	retval = -EAGAIN;
-	if (nr_threads >= max_threads)
+	/**
+	 * max_threads: 表示当前系统最多可以拥有的进程个数,值的大小由系统内存大来决定
+	 * nr_threads: 是系统的全局变量，如果系统中已经分配超过系统最大进程数，那么分配失败。
+	 * 
+	 */ 
+	if (nr_threads >= max_threads){
 		goto bad_fork_cleanup_count;
-
+	}
+		
 	delayacct_tsk_init(p);	/* Must remain after dup_task_struct() */
+	/**
+	 * task_struct 结构中存放进程重要标志位，这些标志位定义在include/linux/shced.h文件中。
+	 */ 
+	// 取消该进程的超级用户权限,以及告诉系统该进程不是一个worker进程
 	p->flags &= ~(PF_SUPERPRIV | PF_WQ_WORKER);
+	// 设置PF_FORKNOEXEC标志位,告诉系统，该进程还不能执行
 	p->flags |= PF_FORKNOEXEC;
+	// 初始化新进程的子进程列表,因为子进程的task_struct是从父进程中复制来的，相关字段还是需要重新初始化
 	INIT_LIST_HEAD(&p->children);
+	// 初始化新进程的兄弟进程列表,因为子进程的task_struct是从父进程中复制来的，相关字段还是需要重新初始化
 	INIT_LIST_HEAD(&p->sibling);
+	// 对PREEMPT_RCU和TASK_RCU进程初始化。
 	rcu_copy_process(p);
 	p->vfork_done = NULL;
 	spin_lock_init(&p->alloc_lock);
@@ -1495,35 +1541,51 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	/* Perform scheduler related setup. Assign this task to a CPU. */
 	retval = sched_fork(clone_flags, p);
-	if (retval)
+	if (retval){
 		goto bad_fork_cleanup_policy;
-
+	}
+		
 	retval = perf_event_init_task(p);
-	if (retval)
+	if (retval){
 		goto bad_fork_cleanup_policy;
+	}
+		
 	retval = audit_alloc(p);
-	if (retval)
+	if (retval){
 		goto bad_fork_cleanup_perf;
+	}		
 	/* copy all the process information */
 	shm_init_task(p);
+	// 复制父进程的semaphore undo_list到子进程。
 	retval = copy_semundo(clone_flags, p);
-	if (retval)
+	if (retval){
 		goto bad_fork_cleanup_audit;
+	}	
+	// 复制父进程打开的文件等信息
 	retval = copy_files(clone_flags, p);
-	if (retval)
+	if (retval){
 		goto bad_fork_cleanup_semundo;
+	}	
+	// 复制父进程fs_struct
 	retval = copy_fs(clone_flags, p);
-	if (retval)
+	if (retval){
 		goto bad_fork_cleanup_files;
+	}	
+	// 复制父进程信号处理器函数
 	retval = copy_sighand(clone_flags, p);
-	if (retval)
+	if (retval){
 		goto bad_fork_cleanup_fs;
+	}
+	// 复制父进程信号系统
 	retval = copy_signal(clone_flags, p);
-	if (retval)
+	if (retval){
 		goto bad_fork_cleanup_sighand;
+	}
+	// 复制父进程内存空间
 	retval = copy_mm(clone_flags, p);
-	if (retval)
+	if (retval){
 		goto bad_fork_cleanup_signal;
+	}
 	retval = copy_namespaces(clone_flags, p);
 	if (retval)
 		goto bad_fork_cleanup_mm;

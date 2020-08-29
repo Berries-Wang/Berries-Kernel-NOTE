@@ -1022,8 +1022,11 @@ static inline void __set_task_cpu(struct task_struct *p, unsigned int cpu)
 	 * successfuly executed on another CPU. We must ensure that updates of
 	 * per-task data have been completed by this moment.
 	 */
+
 	smp_wmb();
+	// 在这之前，使用smp_wmp写入内存屏障语句来保证之前的内容写入完成之后才设置thread_info->cpu。
 	task_thread_info(p)->cpu = cpu;
+	// 设置task的唤醒CPU
 	p->wake_cpu = cpu;
 #endif
 }

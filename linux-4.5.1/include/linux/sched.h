@@ -1413,6 +1413,7 @@ struct task_struct {
 	volatile long state;	
 	void *stack;
 	atomic_t usage;
+	// 进程的状态，定义于:include/linux/sched.h , 如：PF_EXITING
 	unsigned int flags;	/* per process flags, defined below */
 	unsigned int ptrace;
 
@@ -1424,6 +1425,7 @@ struct task_struct {
 	unsigned long wakee_flip_decay_ts;
 	struct task_struct *last_wakee;
 
+    // 表示task唤醒后在哪一个CPU上运行
 	int wake_cpu;
 #endif
 	int on_rq;
@@ -1449,9 +1451,11 @@ struct task_struct {
 	 * 实时进程的优先级
 	 */ 
 	unsigned int rt_priority;
-
+    // 进程的调度类
 	const struct sched_class *sched_class;
+	// 进程的调度实体
 	struct sched_entity se;
+	// 进程实时调度类对应的调度实体
 	struct sched_rt_entity rt;
 #ifdef CONFIG_CGROUP_SCHED
 	struct task_group *sched_task_group;
@@ -1530,7 +1534,7 @@ struct task_struct {
 	unsigned int personality;
 
 	/* scheduler bits, serialized by scheduler locks */
-	unsigned sched_reset_on_fork:1;
+	unsigned sched_reset_on_fork:1; // sched_reset_on_fork标识用于判断是否恢复默认的优先级或调度策略
 	unsigned sched_contributes_to_load:1;
 	unsigned sched_migrated:1;
 	unsigned :0; /* force alignment to the next boundary */
@@ -1552,7 +1556,9 @@ struct task_struct {
 
 	struct restart_block restart_block;
 
+    // 当前轻量级进程的id(准确说应该是线程的ID)
 	pid_t pid;
+	// 当前进程组ID,即进程ID
 	pid_t tgid;
 
 #ifdef CONFIG_CC_STACKPROTECTOR
@@ -1569,7 +1575,9 @@ struct task_struct {
 	/*
 	 * children/sibling forms the list of my natural children
 	 */
-	struct list_head children;	/* list of my children */
+	// 当前进程的子进程列表
+	struct list_head children;	/* list of my children  */
+	// 当前进程的兄弟进程列表
 	struct list_head sibling;	/* linkage in my parent's children list */
 	struct task_struct *group_leader;	/* threadgroup leader */
 
@@ -2905,7 +2913,12 @@ static inline void threadgroup_change_end(struct task_struct *tsk)
 
 static inline void setup_thread_stack(struct task_struct *p, struct task_struct *org)
 {
+	/**
+	 * 将org里面的stack复制到p的stack中
+	 * 见上面的宏定义
+	 */ 
 	*task_thread_info(p) = *task_thread_info(org);
+	// 将p中的stack中的task字段执行p
 	task_thread_info(p)->task = p;
 }
 

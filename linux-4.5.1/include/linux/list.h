@@ -22,8 +22,13 @@
 #define LIST_HEAD(name) \
 	struct list_head name = LIST_HEAD_INIT(name)
 
+/**
+ * 将list->next置为list
+ * 将list->prev>置为list
+ */ 
 static inline void INIT_LIST_HEAD(struct list_head *list)
 {
+	// WRITE_ONCE 定义于文件 include/linux/compile.h中
 	WRITE_ONCE(list->next, list);
 	list->prev = list;
 }

@@ -246,6 +246,7 @@ static __always_inline void __write_once_size(volatile void *p, void *res, int s
 	case 4: *(volatile __u32 *)p = *(__u32 *)res; break;
 	case 8: *(volatile __u64 *)p = *(__u64 *)res; break;
 	default:
+	    // 内存屏障?只能从内存中读取
 		barrier();
 		__builtin_memcpy((void *)p, (const void *)res, size);
 		barrier();

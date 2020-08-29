@@ -358,17 +358,20 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 
 	pgd = _pgd_alloc();
 
-	if (pgd == NULL)
-		goto out;
-
+	if (pgd == NULL){
+	   goto out;	
+	}
+		
 	mm->pgd = pgd;
 
-	if (preallocate_pmds(mm, pmds) != 0)
+	if (preallocate_pmds(mm, pmds) != 0){
 		goto out_free_pgd;
-
-	if (paravirt_pgd_alloc(mm) != 0)
+	}
+		
+	if (paravirt_pgd_alloc(mm) != 0){
 		goto out_free_pmds;
-
+	}
+		
 	/*
 	 * Make sure that pre-populating the pmds is atomic with
 	 * respect to anything walking the pgd_list, so that they

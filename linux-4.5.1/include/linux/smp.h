@@ -183,6 +183,10 @@ static inline void smp_init(void) { }
 #endif
 
 #define get_cpu()		({ preempt_disable(); smp_processor_id(); })
+/**
+ * preempt_disable:禁止内核抢占
+ * preempt_enable:允许内核抢占
+ */ 
 #define put_cpu()		preempt_enable()
 
 /*
