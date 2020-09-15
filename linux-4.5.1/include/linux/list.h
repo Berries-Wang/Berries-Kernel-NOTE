@@ -7,6 +7,12 @@
 #include <linux/const.h>
 #include <linux/kernel.h>
 
+/**
+*
+* Linux内核链表操作
+*
+*/
+
 /*
  * Simple doubly linked list implementation.
  *

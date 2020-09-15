@@ -844,7 +844,7 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
  * @ptr:	the pointer to the member.
  * @type:	the type of the container struct this is embedded in.
  * @member:	the name of the member within the struct.
- * 从task_struct结构体成员的地址计算出task_struct的地址,即获取task。
+ * 从task_struct结构体成员的地址计算出task_struct的地址,即获取task,不仅仅是struct task_struct,任何使用了Linux内核链表的均可以使用。其实，任何数据结构均可以使用
  */
 #define container_of(ptr, type, member) ({			\
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\

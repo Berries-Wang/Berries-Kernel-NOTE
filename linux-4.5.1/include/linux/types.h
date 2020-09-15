@@ -182,6 +182,10 @@ typedef struct {
 } atomic64_t;
 #endif
 
+/**
+*
+* Linux内核链表数据结构实现,需要配合container_of(定义于文件<linux/kernel.h>)宏使用,链表操作方法定义在文件<linux/list.h>中
+*/
 struct list_head {
 	struct list_head *next, *prev;
 };

@@ -1,5 +1,5 @@
 /*
- * A generic kernel FIFO implementation
+ * A generic kernel FIFO implementation Linux内核队列实现
  *
  * Copyright (C) 2013 Stefani Seibold <stefani@seibold.net>
  *
