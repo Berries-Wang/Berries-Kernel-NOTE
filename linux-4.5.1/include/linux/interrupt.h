@@ -130,6 +130,23 @@ request_threaded_irq(unsigned int irq, irq_handler_t handler,
 		     irq_handler_t thread_fn,
 		     unsigned long flags, const char *name, void *dev);
 
+/**
+ * @desc: 驱动程序可以通过函数request_irq函数注册一个中断处理函数.(分配一条给定的中断线)
+ * @param irq: 表示要分配的中断号，
+ * @param handler: 函数指针，指向中断处理程序，只要操作系统接受到中断，该函数就会被调用
+ * @param flags: 可以是0，也可以是下列一个或多个标识的掩码
+ *             IRQF_DISABLED:若设置了该标志位，则意味着内核在处理中断程序本身期间，要禁止所有的其他中断
+ *             IRQE_SAMPLE_RANDOM: 该标志表明这个设备产生的中断对内核熵池有贡献。这就意味着该设置的中断的产生是随机的，不是有一定规律的。
+ *             IRQE_TIMER: 该标识是为了系统定时器的中断处理而准备的
+ *             IRQE_SHARED: 表明可以在多个中断处理程序之间共享中断线
+ * @param name: 与中断相关的设置的ASCII文本表示。
+ * @param dev: 用于共享中断线，当一个中断处理程序需要释放的时候，dev将提供唯一标识，以便从共享中断线的诸多中断程序中删除指定的那一个。
+ * 
+ * 成功将会返回0，失败返回非0值
+ * 
+ * 
+ * __must_check: 表示该函数的调用者一定要处理该函数的返回值，否则编译器在编译时会给出警告.
+ */ 
 static inline int __must_check
 request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags,
 	    const char *name, void *dev)
@@ -145,6 +162,15 @@ extern int __must_check
 request_percpu_irq(unsigned int irq, irq_handler_t handler,
 		   const char *devname, void __percpu *percpu_dev_id);
 
+/**
+ * 注销中断处理程序
+ * 
+ * @param unsigned int: 中断号(中断线)
+ * @param void* 调用函数request_irq的dev(一个标识,内核才能知道去注销哪一个中断处理程序)
+ * 
+ * 功能: 如果指定的中断线不是共享的，那么该函数删除处理程序的同时将禁用该中断线.
+ *       如果指定的中断线是共享的，那么仅删除dev多对应的处理程序,当该中断线的最后一个中断处理程序也被删除了，那么该中断线也会被禁用
+ */ 
 extern void free_irq(unsigned int, void *);
 extern void free_percpu_irq(unsigned int, void __percpu *);
 

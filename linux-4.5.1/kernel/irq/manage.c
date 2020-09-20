@@ -1530,7 +1530,7 @@ void remove_irq(unsigned int irq, struct irqaction *act)
 EXPORT_SYMBOL_GPL(remove_irq);
 
 /**
- *	free_irq - free an interrupt allocated with request_irq
+ *	free_irq - free an interrupt allocated with request_irq。(释放中断处理程序)
  *	@irq: Interrupt line to free
  *	@dev_id: Device identity to free
  *
@@ -1542,6 +1542,8 @@ EXPORT_SYMBOL_GPL(remove_irq);
  *	have completed.
  *
  *	This function must not be called from interrupt context.
+ *   功能: 如果指定的中断线不是共享的，那么该函数删除处理程序的同时将禁用该中断线.
+ *         如果指定的中断线是共享的，那么仅删除dev多对应的处理程序,当该中断线的最后一个中断处理程序也被删除了，那么该中断线也会被禁用
  */
 void free_irq(unsigned int irq, void *dev_id)
 {
