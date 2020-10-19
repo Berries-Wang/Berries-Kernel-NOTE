@@ -53,6 +53,12 @@ irq_cpustat_t irq_stat[NR_CPUS] ____cacheline_aligned;
 EXPORT_SYMBOL(irq_stat);
 #endif
 
+/**
+ * 
+ * 软中断声明,定值,目前是10个,最多可能是32个
+ * 为什么是32个?因为在代码中,默认只有32个,如pending的类型为U32,每一位代表一种软中断。
+ * 
+ */ 
 static struct softirq_action softirq_vec[NR_SOFTIRQS] __cacheline_aligned_in_smp;
 
 DEFINE_PER_CPU(struct task_struct *, ksoftirqd);

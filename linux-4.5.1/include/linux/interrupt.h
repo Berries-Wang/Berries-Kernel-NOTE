@@ -427,9 +427,11 @@ extern bool force_irqthreads;
 #endif
 
 /* PLEASE, avoid to allocate new softirqs, if you need not _really_ high
-   frequency threaded job scheduling. For almost all the purposes
-   tasklets are more than enough. F.e. all serial device BHs et
-   al. should be converted to tasklets, not to softirqs.
+* frequency threaded job scheduling. For almost all the purposes
+ *  tasklets are more than enough. F.e. all serial device BHs et
+ *  al. should be converted to tasklets, not to softirqs.
+ * 
+ * 尽可能使用tasklet来实现下半部,而不要使用软中断来实现下半部
  */
 
 enum
@@ -458,8 +460,9 @@ extern const char * const softirq_to_name[NR_SOFTIRQS];
 
 /* softirq mask and active fields moved to irq_cpustat_t in
  * asm/hardirq.h to get better cache usage.  KAO
+ * 
+ * 软中断数据结构表现形式
  */
-
 struct softirq_action
 {
 	void	(*action)(struct softirq_action *);
