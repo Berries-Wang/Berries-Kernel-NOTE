@@ -403,6 +403,9 @@ void irq_exit(void)
 
 /*
  * This function must run with irqs disabled!
+ * 
+ *  __raise_softirq_irqoff 会设置本地CPU的irq_stat数据结构中__softirq_pending成员的第nr个比特位，nr表示软中断的序号。
+ * 在返回的时候，该CPU会检查__softirq_pending成员的比特位，如果__softirq_pending不为0，则说明有pending的软中断需要处理。
  */
 inline void raise_softirq_irqoff(unsigned int nr)
 {
@@ -416,9 +419,14 @@ inline void raise_softirq_irqoff(unsigned int nr)
 	 *
 	 * Otherwise we wake up ksoftirqd to make sure we
 	 * schedule the softirq soon.
+	 * 
+	 * 如果触发点在中断上下文，则只需要设置本地CPU的__softirq_pending中软中断对应比特位即可。
+	 * in_interrupt为0，则说明现在运行在进程上下文中，那么需要调用wakeup_softirqd函数来唤醒ksoftirqd内核线程来处理。
 	 */
-	if (!in_interrupt())
+	if (!in_interrupt()){
 		wakeup_softirqd();
+	}
+		
 }
 
 void raise_softirq(unsigned int nr)
@@ -449,22 +457,50 @@ struct tasklet_head {
 	struct tasklet_struct **tail;
 };
 
+/**
+ * 声明tasklet_vec变量和tasklet_hi_vec变量
+ * 
+ */ 
 static DEFINE_PER_CPU(struct tasklet_head, tasklet_vec);
 static DEFINE_PER_CPU(struct tasklet_head, tasklet_hi_vec);
 
+/**
+ *  tasklet 调度，用于调度TASKLET_SOFTIRQ类型的软中断
+ * 
+ * 
+ */ 
 void __tasklet_schedule(struct tasklet_struct *t)
 {
 	unsigned long flags;
 
+    /**
+	 * 禁止中断--《Linux内核设计与实现》 P104
+	 * local_irq_save是一个宏函数，用于保存中断状态到flags变量中
+	 */ 
 	local_irq_save(flags);
 	t->next = NULL;
+
+	// 将需要调度的tasklet加到每一个处理器一个tasklet_vec链表上
 	*__this_cpu_read(tasklet_vec.tail) = t;
 	__this_cpu_write(tasklet_vec.tail, &(t->next));
+	/**
+	 * raise_softirq 触发软中断
+	 * 
+	 * raise_softirq 函数可以将一个软中断设置为挂起状态，触发后在恢复原来的状态，让他在下一次调用do_softirq函数时投入使用。
+	 * 如果中断本来就已经禁止了，那么可以调用另一函数raise_soft_irqoff，这会带来一些优化。
+	 */ 
 	raise_softirq_irqoff(TASKLET_SOFTIRQ);
+	// 中断被恢复到他们原来的状态 --《Linux内核设计与实现》 P104
 	local_irq_restore(flags);
 }
 EXPORT_SYMBOL(__tasklet_schedule);
 
+
+/**
+ *  tasklet 调度，用于调度HI_SOFTIRQ类型的软中断
+ * 
+ * 
+ */ 
 void __tasklet_hi_schedule(struct tasklet_struct *t)
 {
 	unsigned long flags;
@@ -488,38 +524,73 @@ void __tasklet_hi_schedule_first(struct tasklet_struct *t)
 }
 EXPORT_SYMBOL(__tasklet_hi_schedule_first);
 
+/**
+ * tasklet 处理的核心,处理TASKLET_SOFTIRQ类型的软中断
+ * 
+ */ 
 static void tasklet_action(struct softirq_action *a)
 {
 	struct tasklet_struct *list;
-
+    /**
+	 * 禁止中断
+	 * 注意，这里没有使用local_irq_save函数来保留中断状态
+	 * 
+	 */ 
 	local_irq_disable();
+	// 为当前处理器检索出tasklet_vec链表
 	list = __this_cpu_read(tasklet_vec.head);
 	__this_cpu_write(tasklet_vec.head, NULL);
 	__this_cpu_write(tasklet_vec.tail, this_cpu_ptr(&tasklet_vec.head));
+	// 允许相应中断.
 	local_irq_enable();
 
+	/**
+	 * 循环处理tasklet
+	 */ 
 	while (list) {
 		struct tasklet_struct *t = list;
-
+        
 		list = list->next;
-
+        /**
+		 *  尝试加锁
+		 *  当tasklet的状态是TASKLET_STATE_RUN,则返回false，表示加锁失败(也就是该tasklet在另外的CPU上被处理了)，这样做是为了保证同一个tasklet只能在一个CPU上运行.
+		 */ 
 		if (tasklet_trylock(t)) {
+			// 判断tasklet的count字段是否为0，即该tasklet是否被禁止。若禁止了，则处理下一个tasklet
 			if (!atomic_read(&t->count)) {
-				if (!test_and_clear_bit(TASKLET_STATE_SCHED,
-							&t->state))
+				/**
+				 * 检测tasklet的状态是否为TASKLET_STATE_SCHED， 并将该状态置为0.如果失败，则调用BUG函数.
+				 * (test_and_clear_bit函数定义于:include\asm-generic\bitops\atomic.h)
+				 */ 
+				if (!test_and_clear_bit(TASKLET_STATE_SCHED,&t->state)){
 					BUG();
+				}
+				// 调用tasklet的处理函数来处理tasklet,
 				t->func(t->data);
+				/**
+				 * 解锁
+				 * 这时候会清除tasklet的TASKLET_STATE_RUN状态.
+				 * 
+				 * 顺序为: 清理TASKLET_STATE_SCHED状态 ->  调用tasklet处理函数 -> 清除TASKLET_STATE_RUN状态
+				 * 之所以后清理TASKLET_STATE_RUN状态,是为了在调用tasklet处理函数的时候能够响应新调度的tasklet，以免丢失。
+				 */
 				tasklet_unlock(t);
 				continue;
 			}
 			tasklet_unlock(t);
 		}
 
+        // 当前的tasklet处理完成之后
+
+		// 禁止中断
 		local_irq_disable();
+		// 获取锁失败(tasklet_trylock返回了false)，则将tasklet重新挂入到当前CPU的tasklet_vec链表上，等待下一次执行.	
 		t->next = NULL;
 		*__this_cpu_read(tasklet_vec.tail) = t;
 		__this_cpu_write(tasklet_vec.tail, &(t->next));
+		// 触发一次软中断,
 		__raise_softirq_irqoff(TASKLET_SOFTIRQ);
+		// 启用中断
 		local_irq_enable();
 	}
 }

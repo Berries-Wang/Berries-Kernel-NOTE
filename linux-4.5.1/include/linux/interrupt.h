@@ -497,10 +497,10 @@ static inline struct task_struct *this_cpu_ksoftirqd(void)
 /* Tasklets --- multithreaded analogue of BHs.
 
    Main feature differing them of generic softirqs: tasklet
-   is running only on one CPU simultaneously.
+   is running only on one CPU simultaneously.(不同于一般软中断的主要特征:微线程只能在一个CPU上同时运行。)
 
    Main feature differing them of BHs: different tasklets
-   may be run simultaneously on different CPUs.
+   may be run simultaneously on different CPUs.(不同的微线程可以在不同的cpu上同时运行。)
 
    Properties:
    * If tasklet_schedule() is called, then tasklet is guaranteed
@@ -512,14 +512,26 @@ static inline struct task_struct *this_cpu_ksoftirqd(void)
    * Tasklet is strictly serialized wrt itself, but not
      wrt another tasklets. If client needs some intertask synchronization,
      he makes it with spinlocks.
- */
 
+	 tasklet结构体,每个结构体单独代表一个tasklet
+ */
 struct tasklet_struct
 {
+	// 链表中的下一个tasklet
 	struct tasklet_struct *next;
+	/**
+	 * tasklet的状态
+	 *  取值只能在0，TASKLET_STATE_SCHED(表示tasklet已经被调度),TASKLET_STATE_RUN(tasklet正在运行)之间取值。
+	 */ 
 	unsigned long state;
+	/**
+	 * 引用计数器
+	 *  如果不为0，则表示该tasklet被禁止，不允许执行，只有当count为0的时候，tasklet才被激活，并且在设置为挂起状态的时候才能执行。
+	 */
 	atomic_t count;
+	// tasklet处理函数
 	void (*func)(unsigned long);
+	// 给tasklet处理函数的参数,也是func的唯一参数
 	unsigned long data;
 };
 
@@ -529,11 +541,21 @@ struct tasklet_struct name = { NULL, 0, ATOMIC_INIT(0), func, data }
 #define DECLARE_TASKLET_DISABLED(name, func, data) \
 struct tasklet_struct name = { NULL, 0, ATOMIC_INIT(1), func, data }
 
-
+/**
+ * tasklet_struct 结构体state字段的取值枚举
+ */ 
 enum
 {
-	TASKLET_STATE_SCHED,	/* Tasklet is scheduled for execution */
-	TASKLET_STATE_RUN	/* Tasklet is running (SMP only) */
+	/**
+	 *  Tasklet is scheduled for execution
+	 *  tasklet已经被调度了，准备执行 
+	 **/
+	TASKLET_STATE_SCHED,	
+	/**
+	 *  Tasklet is running (SMP only) 
+	 * tasklet正在运行，只有在多处理器的系统上才会作为一种优化来使用，单处理器任何时候都清楚单个tasklet是否正在运行
+	 */
+	TASKLET_STATE_RUN	
 };
 
 #ifdef CONFIG_SMP
@@ -553,17 +575,25 @@ static inline void tasklet_unlock_wait(struct tasklet_struct *t)
 	while (test_bit(TASKLET_STATE_RUN, &(t)->state)) { barrier(); }
 }
 #else
-#define tasklet_trylock(t) 1
-#define tasklet_unlock_wait(t) do { } while (0)
-#define tasklet_unlock(t) do { } while (0)
+#define tasklet_trylock(t) 1  // 不同平台调用不同的方法,见上
+#define tasklet_unlock_wait(t) do { } while (0)  // 不同平台调用不同的方法,见上
+#define tasklet_unlock(t) do { } while (0)   // 不同平台调用不同的方法,见上
 #endif
 
 extern void __tasklet_schedule(struct tasklet_struct *t);
 
+/**
+ * tasklet调度函数
+ */ 
 static inline void tasklet_schedule(struct tasklet_struct *t)
 {
-	if (!test_and_set_bit(TASKLET_STATE_SCHED, &t->state))
+	/** 判断当前tasklet的状态是否为TASKLET_STATE_SCHED，
+	 * 即是否已经被调度过了，因为有可能是一个tasklet已经被调度过了，但是还没来得及执行，而该tasklet又被唤醒了一次 */
+	if (!test_and_set_bit(TASKLET_STATE_SCHED, &t->state)){
+		// 调用__tasklet_schedule函数
 		__tasklet_schedule(t);
+	}
+		
 }
 
 extern void __tasklet_hi_schedule(struct tasklet_struct *t);
