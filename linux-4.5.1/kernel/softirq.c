@@ -233,11 +233,21 @@ static inline bool lockdep_softirq_start(void) { return false; }
 static inline void lockdep_softirq_end(bool in_hardirq) { }
 #endif
 
+
+/**
+ * 
+ * 软中断处理程序
+ * 
+ */ 
 asmlinkage __visible void __do_softirq(void)
 {
 	unsigned long end = jiffies + MAX_SOFTIRQ_TIME;
 	unsigned long old_flags = current->flags;
+	// 固定值10,后续会讲到其作用
 	int max_restart = MAX_SOFTIRQ_RESTART;
+	/**
+	 *  struct softirq_action:  软中断结构体
+	 */ 
 	struct softirq_action *h;
 	bool in_hardirq;
 	__u32 pending;
@@ -247,23 +257,48 @@ asmlinkage __visible void __do_softirq(void)
 	 * Mask out PF_MEMALLOC s current task context is borrowed for the
 	 * softirq. A softirq handled such as network RX might set PF_MEMALLOC
 	 * again if the socket is related to swap
+	 * 
+	 * 这行代码和tsk_restore_flags代码是配对使用的，PF_MEMALLOC主要用在:
+	 *  1. 直接内存压缩的路径
+	 *  2. 网络子系统在分配skbuff失败时会设置PF_MEMALLOC标志位.
 	 */
 	current->flags &= ~PF_MEMALLOC;
-
+    /**
+	 * 判断是否有软中断需要处理
+	 * 宏定义于文件: include\linux\irq_cpustat.h
+	 * 
+	 * 主要是判断结构体irq_cpustat_t的__softirq_pending字段
+	 */ 
 	pending = local_softirq_pending();
-	account_irq_enter_time(current);
 
+	account_irq_enter_time(current);
+   /**
+	* 增加preempt_count中的SOFTIRQ域的计数，表明现在是在软中断上下文中
+	*  该函数是内核日工的关闭软中断的锁机制，前面(如do_softirq函数)禁止了软中断，这里又禁止了软中断，这并不是多此一举,
+	* 是因为local_irq_save是禁止本地CPU的中断，local_bh_disable是增加抢占计数中的软中断计数来禁止中断，这种是避免软中断在同一个CPU上重入的关键。
+	* 因为软中断在某个CPU上必须串行执行。
+	*/
 	__local_bh_disable_ip(_RET_IP_, SOFTIRQ_OFFSET);
+	// ?
 	in_hardirq = lockdep_softirq_start();
 
 restart:
-	/* Reset the pending bitmask before enabling irqs */
+	/**
+	 * Reset the pending bitmask before enabling irqs
+	 * 重置CPU的状态位置
+	 */
 	set_softirq_pending(0);
-
+	// 开启中断
 	local_irq_enable();
 
 	h = softirq_vec;
-
+    
+	/**
+	 * while循环依次处理软中断
+	 * 
+	 * ffs函数会找到pending中第一个置为的比特位
+	 * 
+	 */ 
 	while ((softirq_bit = ffs(pending))) {
 		unsigned int vec_nr;
 		int prev_count;
@@ -289,44 +324,76 @@ restart:
 	}
 
 	rcu_bh_qs();
+	// 关闭本地中断
 	local_irq_disable();
-
+    // 在此检查__softirq_pending是否又出现了中断
 	pending = local_softirq_pending();
 	if (pending) {
+		/**
+		 * 如果出现了软中断(因为在处理软中断是开启中断的情况下进行的)，并不是马上跳转到restart重新开始执行，而是有三个条件:
+		 * 1. 软中断时间没有超过2毫秒
+		 * 2. 当前进程没有调度要求
+		 * 3. 循环不能多于10次
+		 * 
+		 */ 
 		if (time_before(jiffies, end) && !need_resched() &&
-		    --max_restart)
-			goto restart;
-
+		    --max_restart){
+				goto restart;
+			}		
+        // 在处理软中断的过程中，又发生了中断，且不满足restart条件，则唤起内核线程来处理中断
 		wakeup_softirqd();
 	}
 
 	lockdep_softirq_end(in_hardirq);
 	account_irq_exit_time(current);
+	// 处理完成一次软中断，计数器减一,要是马上又产生中断了，则可以立即进入此函数(__do_softirq)进行处理
 	__local_bh_enable(SOFTIRQ_OFFSET);
 	WARN_ON_ONCE(in_interrupt());
+	// 与代码 current->flags &= ~PF_MEMALLOC; 配对使用
 	tsk_restore_flags(current, old_flags, PF_MEMALLOC);
 }
 
+/**
+ * 软中断处理程序
+ * 
+ */ 
 asmlinkage __visible void do_softirq(void)
 {
 	__u32 pending;
 	unsigned long flags;
 
-	if (in_interrupt())
-		return;
-
+	/**
+	 * 如果触发点在中断上下文，则只需要设置本地CPU的__softirq_pending中软中断对应比特位即可。
+	 * in_interrupt为0，则说明现在运行在进程上下文中，那么
+	 * 需要调用wakeup_softirqd函数来唤醒ksoftirqd内核线程来处理。
+	 * 
+	 * in_interrupt表示程序是否处于中断上下文(硬件中断上下文、软件中断上下文)。如果处于，则和ksoftirqd内核线程互斥
+	 */ 
+	if (in_interrupt()){
+			return;
+	}
+	// 禁止中断(本地CPU中断)，并保存中断状态到flags中
 	local_irq_save(flags);
-
+    
+	/**
+	 * 判断是否有软中断需要处理
+	 * 宏定义于文件: include\linux\irq_cpustat.h
+	 * 
+	 * 主要是判断结构体irq_cpustat_t的__softirq_pending字段
+	 */ 
 	pending = local_softirq_pending();
 
-	if (pending)
+   // 如果有，则进行处理
+	if (pending){
+		// 不同平台调用不同函数，但内部都会调用__do_softirq();函数来处理软中断
 		do_softirq_own_stack();
-
+	}
+    // 恢复中断状态
 	local_irq_restore(flags);
 }
 
 /*
- * Enter an interrupt context.
+ * Enter an interrupt context.(进入一个中断上下文)
  */
 void irq_enter(void)
 {
@@ -422,6 +489,8 @@ inline void raise_softirq_irqoff(unsigned int nr)
 	 * 
 	 * 如果触发点在中断上下文，则只需要设置本地CPU的__softirq_pending中软中断对应比特位即可。
 	 * in_interrupt为0，则说明现在运行在进程上下文中，那么需要调用wakeup_softirqd函数来唤醒ksoftirqd内核线程来处理。
+	 * 
+	 * in_interrupt: 表示程序是否处于中断上下文(硬件中断上下文和软件中断上下文)
 	 */
 	if (!in_interrupt()){
 		wakeup_softirqd();
