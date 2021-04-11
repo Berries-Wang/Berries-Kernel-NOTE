@@ -73,8 +73,17 @@ extern int register_refined_jiffies(long clock_tick_rate);
  * The 64-bit value is not atomic - you MUST NOT read it
  * without sampling the sequence number in jiffies_lock.
  * get_jiffies_64() will do this for you as appropriate.
+ * 
+ * 如《Linux内核设计与实现》 
+ * jiffies会使用jiffies_64变量的低32位，代码可以完全像以前一样继续访问jiffies,因为大多数代码只不过使用jiffies来存放流失的时间。
+ * 但是时间管理会实际使用到整个64位，以此避免整个64位的溢出。
  */
 extern u64 __jiffy_data jiffies_64;
+
+/**
+ *  unsigned long 在64位体系结构上是64位，在32位体系结构上是32位。
+ *  历史上jiffies就是unsigned long ,jifies_64是后来的
+ */ 
 extern unsigned long volatile __jiffy_data jiffies;
 
 #if (BITS_PER_LONG < 64)
