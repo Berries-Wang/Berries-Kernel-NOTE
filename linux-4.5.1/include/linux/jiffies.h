@@ -155,8 +155,11 @@ static inline u64 get_jiffies_64(void)
 
 /*
  * These four macros compare jiffies and 'a' for convenience.
+ * 
+ *  time_after 是为了解决jiffies回绕(即溢出)问题
+ * 
+ * 
  */
-
 /* time_is_before_jiffies(a) return true if a is before jiffies */
 #define time_is_before_jiffies(a) time_after(jiffies, a)
 
