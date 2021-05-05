@@ -7,7 +7,7 @@
  *
  * Version:	@(#)in.h	1.0.1	04/21/93
  *
- * Authors:	Original taken from the GNU Project <netinet/in.h> file.
+ * Authors:	Original taken from the GNU Project <netinet/in.h> file.(原件取自GNU项目<netinet/in.h>文件)
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
  *
  *		This program is free software; you can redistribute it and/or
