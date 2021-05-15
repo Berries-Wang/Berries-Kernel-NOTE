@@ -1017,12 +1017,16 @@ long do_sys_open(int dfd, const char __user *filename, int flags, umode_t mode)
 
 	fd = get_unused_fd_flags(flags);
 	if (fd >= 0) {
+		/***
+		 * do_filp_open 查找文件的inode
+		 */
 		struct file *f = do_filp_open(dfd, tmp, &op);
 		if (IS_ERR(f)) {
 			put_unused_fd(fd);
 			fd = PTR_ERR(f);
 		} else {
 			fsnotify_open(f);
+			// 将file实例放置到进程task_struct的files->fd数组中
 			fd_install(fd, f);
 		}
 	}
@@ -1030,8 +1034,14 @@ long do_sys_open(int dfd, const char __user *filename, int flags, umode_t mode)
 	return fd;
 }
 
+/***
+ * 
+ * 读和写文件的时候，必须先打开文件。即通过标注库open函数完成的(即该系统调用)
+ * 
+ */ 
 SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, umode_t, mode)
 {
+	// force_o_largefile 检查是否应该不考虑用户层传递的标志，总是强行设置O_LARGEFILE
 	if (force_o_largefile())
 		flags |= O_LARGEFILE;
 
