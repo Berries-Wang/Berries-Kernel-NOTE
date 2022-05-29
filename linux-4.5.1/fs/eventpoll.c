@@ -155,7 +155,10 @@ struct epitem {
 	 */
 	struct epitem *next;
 
-	/* The file descriptor information this item refers to */
+	/**
+	 *  The file descriptor information this item refers to 
+	 * 事件句柄信息
+	 * */
 	struct epoll_filefd ffd;
 
 	/* Number of active wait queue attached to poll operations */
@@ -164,7 +167,10 @@ struct epitem {
 	/* List containing poll wait queues */
 	struct list_head pwqlist;
 
-	/* The "container" of this item */
+	/**
+	 *  The "container" of this item
+	 * 指向其所属的eventpoll对象
+	 *  */
 	struct eventpoll *ep;
 
 	/* List header used to link this item to the "struct file" items list */
@@ -173,7 +179,10 @@ struct epitem {
 	/* wakeup_source used when EPOLLWAKEUP is set */
 	struct wakeup_source __rcu *ws;
 
-	/* The structure that describe the interested events and the source fd */
+	/**
+	 * The structure that describe the interested events and the source fd 
+	 * 期待的事件类型
+	 * */
 	struct epoll_event event;
 };
 
@@ -200,10 +209,18 @@ struct eventpoll {
 	/* Wait queue used by file->poll() */
 	wait_queue_head_t poll_wait;
 
-	/* List of ready file descriptors */
+	/**
+	 * 
+	 *  List of ready file descriptors
+	 * 双向链表rdllist保存着将要通过epoll_wait返回给用户的，满足条件的事件
+	 *  */
 	struct list_head rdllist;
 
-	/* RB tree root used to store monitored fd structs */
+	/**
+	 *  RB tree root used to store monitored fd structs 
+	 * 
+	 * 红黑树的根节点，这棵树存储着所有添加到epoll中的事件，也就是这个epoll监控的事件 
+	 **/
 	struct rb_root rbr;
 
 	/*

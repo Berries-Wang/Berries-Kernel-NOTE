@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.ic": "cpp",
+        "poll.h": "c"
+    }
+}

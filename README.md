@@ -12,4 +12,4 @@ Linux 内核源代码
 ## 参考资料
 1. 《深入理解Linux内核》
 2. 《奔跑吧，Linux内核》
-3. 《Linux内核的设计与实现》
+3. 《Linux内核的设计与实现》PTHREAD_STACK_MIN
