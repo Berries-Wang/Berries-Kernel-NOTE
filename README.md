@@ -20,8 +20,8 @@ GNU C 对C语言进行了拓展，具体请参考:[002.C&GNU_C](./002.C&GNU_C/).
      char buf[];
    };
    // __attribute__ 为 GNU C 拓展
-   // 更节约内存了，对于标准的C来说，存在对其规则, 大小 4x bytes
-   // 使用了 __attribute__ 之后，不存在对齐规则(按照一个字节对齐)，所以实际大小: 9 + n (n为buf长度) bytes
+   // 更节约内存了，对于标准的C来说，存在对齐规则, 大小 4x bytes
+   // 使用了 __attribute__ 之后，修改了标准C的对齐规则(按照一个字节对齐)，所以实际大小: 9 + n (n为buf长度) bytes
 
    // 测试代码: 004.TEST_CODE_SPACE/000.GNU_C__attribute__.c
 ```
