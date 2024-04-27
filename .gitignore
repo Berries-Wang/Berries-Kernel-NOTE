@@ -51,4 +51,4 @@ Module.symvers
 Mkfile.old
 dkms.conf
 *.iml
-004.TEST_CODE_SPACE
+004.TEST_CODE_SPACE/*.out
