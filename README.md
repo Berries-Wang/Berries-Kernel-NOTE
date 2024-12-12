@@ -26,6 +26,10 @@ GNU C 对C语言进行了拓展，具体请参考:[002.C&GNU_C](./002.C&GNU_C/).
    // 测试代码: 004.TEST_CODE_SPACE/000.GNU_C__attribute__.c
 ```
 
+## 附录
+### Ubuntu 下epub阅读工具
+- Foliate
+
 ## 参考资料
 1. 《奔跑吧，Linux内核》
 2. 《Linux内核的设计与实现》PTHREAD_STACK_MIN
