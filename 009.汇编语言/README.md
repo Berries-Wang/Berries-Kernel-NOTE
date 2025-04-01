@@ -1,4 +1,6 @@
 # 汇编语言
+> 阅读[006.BOOKs/002.Unlocking-The-Java-Virtual-Machine-2.pdf](../006.BOOKs/006.BOOKs/002.Unlocking-The-Java-Virtual-Machine-2.pdf) 了解一下函数调用的寄存器和压栈出栈流程
+
 ## 指令和数据
 指令和数据是应用上的概念。在内存或磁盘上，指令和数据并没有任何区别，都是二进制信息。CPU在工作的时候把有的信息看做指令，有的信息看做数据，为同样的信息赋予不同的意义<sup>那这是怎么区分的呢?</sup>。
 

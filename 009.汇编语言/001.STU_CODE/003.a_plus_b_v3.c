@@ -9,12 +9,12 @@ int main(int argc, char **argv) {
 
   result = add(a, b);
 
-  printf("result: %d \n", result);
+  printf("a:%d , b:%d,result: %d \n",a,b, result);
 
   return 0;
 }
 
 int add(int a, int b) {
-  int c = a + b;
+  int c = a+b;
   return c;
 }
