@@ -53,3 +53,4 @@ dkms.conf
 *.iml
 004.TEST_CODE_SPACE/*.out
 .DS_Store
+**/**/app
