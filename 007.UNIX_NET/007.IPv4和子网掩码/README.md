@@ -25,3 +25,7 @@
   IP 转为CIDR写法为 192.168.0.3/30
 
 ```
+
+## 参考资料
++ [什么是组播、单播、广播](https://info.support.huawei.com/info-finder/encyclopedia/zh/%E7%BB%84%E6%92%AD.html)
+   - [什么是组播？组播和单播的区别是什么？%20-%20华为.html](../005.REFS/什么是组播？组播和单播的区别是什么？%20-%20华为.html)
