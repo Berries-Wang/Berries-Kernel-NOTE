@@ -1,0 +1,36 @@
+# 进程调度
+__schedule()是调度器的核心函数，其作用是让调度器选择和切换到一个合适进程并运行。`调度的时机`可以分为如下3种。
++ 在阻塞操作中，如使用互斥量（mutex）、信号量（semaphore）、等待队列（waitqueue）等。
++ 在中断返回前和系统调用返回用户空间时，检查TIF_NEED_RESCHED标志位以判断是否需要调度。
++ 将要被唤醒的进程不会马上调用schedule()，而是会被添加到CFS就绪队列中，并且设置了TIF_NEED_RESCHED标志位。
+
+那么被唤醒的进程`什么时候被调度`呢？这要根据内核是否具有可抢占功能（CONFIG_PREEMPT=y）分两种情况。
++ 如果内核可抢占，则根据情况执行不同操作。
+   - 如果唤醒动作发生在系统调用或者异常处理上下文中，在下一次调用preempt_enable()时会检查是否需要抢占调度。
+   - 如果唤醒动作发生在硬中断处理上下文中，硬件中断处理返回前会检查是否要抢占当前进程。
++ 如果内核不可抢占，则执行以下操作。
+   - 当前进程调用cond_resched()时会检查是否要调度。
+   - 主动调用schedule()。
+
+---
+
+## user-mode & kernel-mode
+”mode-switch“ 是一个运行的task从user-mode 切换到 kernel-mode，或者切换回来， 而 ”context-swtich“ 一定发生在kernel-mode , 进行task切换
+
+每个user task 有一个user-mode stack 和 一个 kernel-mode stack ， 当从 user-mode 切换到 kernel-mode 时，寄存器的值要保存到 kernel-mode stack 。 反之，从kernel-mode切换回user-mode时，需要把寄存器中的值恢复出来。
+
+进行 ”context-switch“ 时，scheduler 将当前kernel-mode stack 中的值保存在task_struct中，并把下一个将要运行的task的task_struct值恢复到kernel-mode stack中。这样，从kernel-mode 返回 到 user-mode , 就会运行另外一个task
+
+### 疑问
+##### user-mode 如何切换到 kernel-mode，需要执行哪些操作?(主要是寄存器怎么迁移的)
+
+
+##### kernel-mode 如何切换到 user-mode，需要执行哪些操作?(主要是寄存器怎么迁移的)
+
+
+---
+
+## 参考资料
++ [奔跑吧Linux内核 # 8.1.5　进程调度](../../006.BOOKs/Run%20Linux%20Kernel%20(2nd%20Edition)%20Volume%201:%20Infrastructure.epub)
++ [StackOverflow： Context switch internals](../999.REFS/Linux-Kernel-Context_switch_internals-Stack-Overflow.pdf)
++ [arm.community: Use case of MSP and PSP in Cortex M](../999.REFS/Use%20case%20of%20MSP%20and%20PSP%20in%20Cortex%20M%20Arm-Community.pdf)
