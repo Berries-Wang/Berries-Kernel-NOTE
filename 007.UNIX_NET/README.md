@@ -9,4 +9,5 @@
 
 ---
 ## 参考资料
-1. 《UNIX 网络编程第三版 · 卷一》
++ 《UNIX 网络编程第三版 · 卷一》
++ [HUAWEI: Info-Finder 非常棒的网络知识来源](https://info.support.huawei.com/info-finder/vue/zh/enterprise/index)
