@@ -23,6 +23,10 @@
 ### 2. 任播（Anycast）
 任播通过将相同IP地址分配到多个终端节点上, 利用BGP（边界网关协议（BGP））实现最佳路径选择。在网络地址和网络节点之间存在一对多的关系：每一个地址对应一群接收节点，但在任何给定时间，只有其中之一可以接收到发送端来的信息。<sub>使用案例: CDN</sub>
 
+### 3. 网关
+![什么是网关？](./pics/info.support.huawei.com_info-finder_encyclopedia_zh_gateway.html.png)
+
+
 
 ---
 ## 参考资料
