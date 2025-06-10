@@ -37,7 +37,7 @@ __schedule()是调度器的核心函数，其作用是让调度器选择和切�
 进行 ”context-switch“ 时，scheduler 将当前kernel-mode stack 中的值保存在task_struct中，并把下一个将要运行的task的task_struct值恢复到kernel-mode stack中。这样，从kernel-mode 返回 到 user-mode , 就会运行另外一个task
 
 ### 疑问
-关于user-mode 和 kernel-mode ,学习[CPU 内核/用户操作模式 ｜ 处理器中的单个比特如何保护操作系统的安全完整性](../../010.LESSONS/26436437797-1-16.mp4) & [001.UNIX-DOCS/005.syscall-发起系统调用.md](001.UNIX-DOCS/005.syscall-发起系统调用.md)#`系统调用时寄存器&CPU状态如何存储到task_struct中`<sub>因为只有PC CPU状态的保存，而并没有task_struct的切换，就直接进入了内核态执行系统调用</sub> (位于:[Berries-Kernel](https://github.com/Berries-Wang/Berries-Kernel)仓库下),可以发现，并不存在内核线程。切换到内核态，即将执行权限交还给OS，使得能够访问硬件资源，内核态是运行在当前进程的task_struct中的。
+关于user-mode 和 kernel-mode ,学习[CPU 内核/用户操作模式 ｜ 处理器中的单个比特如何保护操作系统的安全完整性](../../010.LESSONS/26436437797-1-16.mp4) & [001.UNIX-DOCS/005.syscall-发起系统调用.md](001.UNIX-DOCS/005.syscall-发起系统调用.md)#`系统调用时寄存器&CPU状态如何存储到task_struct中`<sub>因为只有PC CPU状态的保存，而并没有task_struct的切换，就直接进入了内核态执行系统调用</sub> (位于:[Berries-Kernel](https://github.com/Berries-Wang/Berries-Kernel)仓库下),可以发现，并不存在与当前进程对应的内核进程。切换到内核态，即将执行权限交还给OS，使得能够访问硬件资源，内核态是运行在当前进程的task_struct中的。
 
 ##### user-mode 如何切换到 kernel-mode，需要执行哪些操作?(主要是寄存器怎么迁移的)
 user-mode 切换为 kernel-mode , 会保存user-mode下的PC寄存器以及CPU状态，详见:[001.UNIX-DOCS/005.syscall-发起系统调用.md](001.UNIX-DOCS/005.syscall-发起系统调用.md) (位于:[Berries-Kernel](https://github.com/Berries-Wang/Berries-Kernel)仓库下<sup>由svc引发的软中断</sup>)
