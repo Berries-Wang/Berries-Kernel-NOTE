@@ -24,6 +24,11 @@ __schedule()是调度器的核心函数，其作用是让调度器选择和切�
 
 ---
 
+## 什么是进程?
+### 进程地址空间的划分
+![进程地址空间划分](./../002.THREAD详解/998.IMGS/wechat_2025-05-27_224218_434.png)
+
+---
 ## user-mode & kernel-mode
 ”mode-switch“ 是一个运行的task从user-mode 切换到 kernel-mode，或者切换回来， 而 ”context-swtich“ 一定发生在kernel-mode , 进行task切换
 
