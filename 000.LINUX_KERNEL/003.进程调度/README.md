@@ -1,5 +1,5 @@
 # 进程调度
-> 先学习: [arm:Simplistic interrupt handling](../999.REFS/ARM%20Cortex-A%20(ARMv7-A)%20Series%20Programmer's%20Guide.pdf) & [硬件如何在多任务处理时辅助软件？ | 多进程 | 硬件中断 | 上下文切换](../../010.LESSONS/28434237523-1-192.mp4)
+> 先学习: [arm:Simplistic interrupt handling](../999.REFS/ARM%20Cortex-A%20(ARMv7-A)%20Series%20Programmer's%20Guide.pdf) & [硬件如何在多任务处理时辅助软件？ | 多进程 | 硬件中断 | 上下文切换](../../010.LESSONS/28434237523-1-192.mp4) & [进程--计算机科学最成功的理念](../../010.LESSONS/26404128445-1-192.mp4) 了解什么是进程
 
 >> 需要关联[https://github.com/Berries-Wang/Berries-Kernel](https://github.com/Berries-Wang/Berries-Kernel)一同学习
 
@@ -24,9 +24,14 @@ __schedule()是调度器的核心函数，其作用是让调度器选择和切�
 
 ---
 
-## 什么是进程?
-### 进程地址空间的划分
-![进程地址空间划分](./../002.THREAD详解/998.IMGS/wechat_2025-05-27_224218_434.png)
+## 什么是进程? <sup>进程由什么构成</sup>
+- CPU 状态
+- CPU 寄存器
+- 打开的文件列表
+- 分配给他的IO设备
+- 可执行代码
+- 进程的地址空间： ![进程地址空间划分](./../002.THREAD详解/998.IMGS/wechat_2025-05-27_224218_434.png)
+
 
 ---
 ## user-mode & kernel-mode
@@ -45,6 +50,11 @@ user-mode 切换为 kernel-mode , 会保存user-mode下的PC寄存器以及CPU�
 
 ##### kernel-mode 如何切换到 user-mode，需要执行哪些操作?(主要是寄存器怎么迁移的)
 
+
+
+## 注意
+- fork 是重量级调用，为子进程建立了一个基于父进程的完整副本，然后子进程基于此运行。
+- 每个CPU都有一个通用就绪队列
 
 ---
 
